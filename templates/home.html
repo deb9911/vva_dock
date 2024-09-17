@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-md-4 float-right">
+            <h2>User Profile</h2>
+            <p>{{ user_name }}</p>
+            <p>{{ user_email }}</p>
+            <img src="{{ user_profile_image }}" alt="User Profile Image" class="img-fluid">
+        </div>
+        <div class="col-md-8">
+            <nav class="navbar navbar-light bg-light">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="#">App Information</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#">Commands</a>
+                    </li>
+                </ul>
+            </nav>
+            <div class="app-info">
+                <p>App Name: {{ app_name }}</p>
+                <p>Version: {{ app_version }}</p>
+                <p>Status: {{ app_status }}</p>
+                <p>Last Updated: {{ last_updated }}</p>
+            </div>
+            <ul class="command-list">
+                {% for command in commands %}
+                <li>{{ command }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-md-12">
+            <h2>Recent Activity</h2>
+            <ul>
+                {% for activity in recent_activities %}
+                <li>{{ activity }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

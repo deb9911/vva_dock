@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Add Tab</h1>
+<form method="POST" action="{{ url_for('add_tab') }}">
+    <label for="tab_name">Tab Name:</label>
+    <input type="text" id="tab_name" name="tab_name" required>
+    <button type="submit">Add Tab</button>
+</form>
+{% endblock %}
+
