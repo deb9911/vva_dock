@@ -2,45 +2,61 @@
 
 {% block content %}
 <div class="container mt-5">
-    <div class="row">
-        <div class="col-md-4 float-right">
-            <h2>User Profile</h2>
-            <p>{{ user_name }}</p>
-            <p>{{ user_email }}</p>
-            <img src="{{ user_profile_image }}" alt="User Profile Image" class="img-fluid">
-        </div>
-        <div class="col-md-8">
-            <nav class="navbar navbar-light bg-light">
-                <ul class="navbar-nav">
-                    <li class="nav-item">
-                        <a class="nav-link" href="#">App Information</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#">Commands</a>
-                    </li>
-                </ul>
-            </nav>
-            <div class="app-info">
-                <p>App Name: {{ app_name }}</p>
-                <p>Version: {{ app_version }}</p>
-                <p>Status: {{ app_status }}</p>
-                <p>Last Updated: {{ last_updated }}</p>
+    <!-- User Profile Section -->
+    <div class="row mb-4">
+        <div class="col-md-4 offset-md-8">
+            <div class="info-box">
+                <h2>User Profile</h2>
+                <p>{{ user_name if user_name else 'User Name' }}</p>
+                <p>{{ user_email if user_email else 'user@example.com' }}</p>
+                <img src="{{ user_profile_image if user_profile_image else url_for('static', filename='default-profile.png') }}"
+                     alt="User Profile Image" class="img-fluid rounded-circle">
             </div>
-            <ul class="command-list">
-                {% for command in commands %}
-                <li>{{ command }}</li>
-                {% endfor %}
-            </ul>
         </div>
     </div>
+
+    <!-- App Information and Commands Section -->
     <div class="row">
+        <div class="col-md-6">
+            <div class="info-box">
+                <h2>App Information</h2>
+                <p><strong>App Name:</strong> {{ app_name if app_name else 'My Flask App' }}</p>
+                <p><strong>Version:</strong> {{ app_version if app_version else '1.0' }}</p>
+                <p><strong>Status:</strong> {{ app_status if app_status else 'Running' }}</p>
+                <p><strong>Last Updated:</strong> {{ last_updated if last_updated else 'N/A' }}</p>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="info-box">
+                <h2>Command List</h2>
+                <ul class="command-list">
+                    {% if commands %}
+                        {% for command in commands %}
+                            <li>{{ command }}</li>
+                        {% endfor %}
+                    {% else %}
+                        <li>No commands available</li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity Section -->
+    <div class="row mt-4">
         <div class="col-md-12">
-            <h2>Recent Activity</h2>
-            <ul>
-                {% for activity in recent_activities %}
-                <li>{{ activity }}</li>
-                {% endfor %}
-            </ul>
+            <div class="info-box">
+                <h2>Recent Activity</h2>
+                <ul>
+                    {% if recent_activities %}
+                        {% for activity in recent_activities %}
+                            <li>{{ activity }}</li>
+                        {% endfor %}
+                    {% else %}
+                        <li>No recent activities to show</li>
+                    {% endif %}
+                </ul>
+            </div>
         </div>
     </div>
 </div>

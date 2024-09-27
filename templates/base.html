@@ -1,8 +1,16 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A versatile Flask application for managing your virtual assistant">
+    <meta name="author" content="Your Name">
+    <meta name="keywords" content="Flask, Virtual Assistant, App Management">
     <title>My Flask App</title>
+    <!-- Favicon -->
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}"> <!-- Add your actual favicon here -->
+    <!-- CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
 </head>
@@ -12,59 +20,48 @@
         <nav class="navbar navbar-expand-lg navbar-light bg-light">
             <a class="navbar-brand" href="{{ url_for('home') }}">My Flask App</a>
             <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav"
-                aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                    aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav mr-auto">
-                    <li class="nav-item active">
+                    <li class="nav-item {% if request.endpoint == 'home' %}active{% endif %}">
                         <a class="nav-link" href="{{ url_for('home') }}">Home</a>
                     </li>
-                    <li class="nav-item">
+                    <li class="nav-item {% if request.endpoint == 'debugging' %}active{% endif %}">
                         <a class="nav-link" href="{{ url_for('debugging') }}">Debugging</a>
                     </li>
-                    <li class="nav-item">
+                    <li class="nav-item {% if request.endpoint == 'settings' %}active{% endif %}">
                         <a class="nav-link" href="{{ url_for('settings') }}">Settings</a>
                     </li>
-                    <li class="nav-item">
+                    <li class="nav-item {% if request.endpoint == 'add_tab' %}active{% endif %}">
                         <a class="nav-link" href="{{ url_for('add_tab') }}">Add Tab</a>
                     </li>
                 </ul>
                 <div class="navbar-text user-profile">
-                    <a href="#" class="nav-link">User Profile</a>
+                    <a href="{{ url_for('logout') }}" class="nav-link">Logout</a> <!-- Link to logout or profile page -->
                 </div>
             </div>
         </nav>
     </header>
 
+    <!-- Main content will be injected here -->
     <main class="main-content">
-        <div class="section-wrapper">
-            <div class="container">
-    <div class="row">
-        <div class="col-md-6">
-            <div class="info-box">
-                <h2>App Information</h2>
-                <p>Details about the app go here...</p>
-            </div>
-        </div>
-        <div class="col-md-6">
-            <div class="info-box">
-                <h2>Command List</h2>
-                <ul class="command-list">
-                    <li>Command 1</li>
-                    <li>Command 2</li>
-                    <li>Command 3</li>
-                </ul>
-            </div>
-        </div>
-    </div>
-            </div>
+        <div class="container-fluid"> <!-- Changed to container-fluid for full width -->
+            {% block content %}
+            <!-- Content from child templates will be displayed here -->
+            {% endblock %}
         </div>
     </main>
 
-    <footer class="text-center mt-auto">
+    <footer class="text-center mt-auto py-3 bg-light">
         &copy; 2024 My Flask App
     </footer>
+
+    <!-- JS Scripts -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.3/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
 </body>
 
 </html>

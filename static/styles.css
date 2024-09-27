@@ -5,24 +5,32 @@ body {
     height: 100vh;
     display: flex;
     flex-direction: column;
+    background-color: #f0f2f5; /* Light background color for better contrast */
 }
 
 header {
-    height: 100px; /* Adjust the height as needed */
+    height: 60px; /* Adjusted height for a more compact header */
+    background-color: #ffffff;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Added shadow for depth */
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
 }
 
 .main-content {
     flex-grow: 1;
     display: flex;
-    justify-content: center;
-    align-items: center;
     padding: 20px;
+    background-color: #ffffff;
+    margin: 20px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
 }
 
 .section-wrapper {
     display: flex;
     justify-content: space-between;
-    width: 80%; /* Adjust the width as needed */
+    width: 100%; /* Full width inside the container */
 }
 
 .info-section,
@@ -34,20 +42,32 @@ header {
 .user-profile {
     position: absolute;
     right: 20px;
-    top: 20px;
+    top: 15px;
+    background-color: #ffffff;
+    padding: 10px;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 footer {
-    padding: 10px 0;
-    background-color: #f8f9fa;
+    padding: 15px 0;
+    background-color: #ffffff;
+    text-align: center;
+    box-shadow: 0 -4px 8px rgba(0, 0, 0, 0.1);
 }
 
 .navbar-nav .nav-link {
     color: #007bff;
+    transition: color 0.3s ease-in-out; /* Smooth transition */
+}
+
+.navbar-nav .nav-link:hover {
+    color: #0056b3; /* Slightly darker on hover */
 }
 
 .navbar-nav .nav-link.active {
     font-weight: bold;
+    color: #0056b3; /* Active state color */
 }
 
 .command-list {
@@ -57,6 +77,15 @@ footer {
 
 .command-list li {
     margin-bottom: 10px;
+    padding: 8px;
+    background-color: #ffffff;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: background-color 0.3s ease-in-out; /* Smooth transition */
+}
+
+.command-list li:hover {
+    background-color: #f1f1f1; /* Lighter background on hover */
 }
 
 .info-box {
@@ -69,12 +98,194 @@ footer {
     min-height: 200px;
 }
 
-.command-list {
+/* New styles for the settings page */
+#sidebar {
+    position: fixed;
+    top: 60px; /* Adjusted top to align below the header */
+    left: 0;
+    height: calc(100% - 60px); /* Full height minus header */
+    width: 250px;
+    background-color: #f8f9fa;
+    border-right: 1px solid #dee2e6;
+    padding-top: 20px;
+    overflow-y: auto; /* Scroll if content exceeds viewport height */
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1); /* Add shadow for depth */
+}
+
+#sidebar .nav {
+    flex-direction: column;
+}
+
+#sidebar .nav-link {
+    padding: 15px;
+    color: #495057;
+    border-radius: 0;
+    font-weight: 500;
+    transition: background-color 0.3s ease-in-out, color 0.3s ease-in-out; /* Smooth transitions */
+}
+
+#sidebar .nav-link:hover {
+    background-color: #e9ecef;
+    color: #343a40;
+    text-decoration: none;
+}
+
+#sidebar .nav-link.active {
+    background-color: #007bff;
+    color: #fff;
+}
+
+#settings-content {
+    margin-left: 270px; /* Space for sidebar */
+    padding: 20px;
+}
+
+.settings-section {
+    background-color: #ffffff;
+    padding: 20px;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-control {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+}
+
+.radio-inline {
+    margin-right: 10px;
+}
+
+/* Utility classes for responsiveness */
+@media (max-width: 768px) {
+    #sidebar {
+        position: static;
+        width: 100%;
+        height: auto;
+        border-right: none;
+        box-shadow: none;
+    }
+
+    #settings-content {
+        margin-left: 0;
+    }
+
+    .main-content {
+        margin: 0;
+    }
+}
+
+@media (max-width: 576px) {
+    .user-profile {
+        position: static;
+        margin-top: 15px;
+    }
+}
+
+/* Styles for the debugging page */
+.file-tree {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 10px;
+    max-height: 600px;
+    overflow-y: auto;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.file-tree ul {
     list-style-type: none;
-    padding: 0;
+    padding-left: 20px;
 }
 
-.command-list li {
-    margin-bottom: 10px;
+.file-tree li {
+    cursor: pointer;
+    margin: 5px 0;
+    padding: 5px 10px;
+    border-radius: 4px;
+    transition: background-color 0.3s ease-in-out, color 0.3s ease-in-out; /* Smooth transitions */
 }
 
+.file-tree li:hover {
+    background-color: #e9ecef;
+    color: #343a40;
+}
+
+.file-tree li.selected {
+    background-color: #007bff;
+    color: #ffffff;
+}
+
+.log-reader {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 10px;
+    height: 600px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+#log-content {
+    flex-grow: 1;
+    width: 100%;
+    resize: none;
+    border: none;
+    background-color: #ffffff;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+    border-radius: 4px;
+    padding: 10px;
+}
+
+/* Utility class for the cursor */
+.cursor-pointer {
+    cursor: pointer;
+}
+
+/* Utility classes for highlighting selected items */
+.selected {
+    background-color: #007bff !important;
+    color: #ffffff;
+}
+
+/* Styles for the JSON tree view */
+.tree-node {
+    margin-left: 20px;
+    margin-top: 5px;
+    cursor: pointer;
+}
+
+.tree-label {
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.tree-node.collapsible .tree-label::before {
+    content: "▼";
+    display: inline-block;
+    margin-right: 5px;
+    transform: rotate(0deg);
+    transition: transform 0.3s ease-in-out; /* Smooth rotation transition */
+}
+
+.tree-node.collapsible.collapsed .tree-label::before {
+    transform: rotate(-90deg); /* Rotate arrow to indicate collapsed state */
+}
+
+.tree-node.collapsible > .tree-children {
+    display: none;
+    padding-left: 15px;
+}
+
+.tree-node.collapsible:not(.collapsed) > .tree-children {
+    display: block;
+}

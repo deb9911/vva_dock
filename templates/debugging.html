@@ -1,7 +1,275 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h1>Debugging</h1>
-<p>This is the debugging page of your Flask app.</p>
-{% endblock %}
+<div class="container-fluid">
+    <div class="row">
+        <!-- Progress Bar and Search Button -->
+        <div class="col-md-12">
+            <h4>Debugging</h4>
+            <button id="start-search" class="btn btn-primary mb-3">Search for Log Directory</button>
+            <div class="progress">
+                <div id="progress-bar" class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+            </div>
+            <p id="search-status" class="mt-2">Click "Search for Log Directory" to start the search.</p>
+            <p id="current-directory" class="mt-1 text-muted">Current Directory: Not started</p>
+        </div>
+    </div>
+    <div class="row mt-4">
+        <!-- File Tree Sidebar -->
+        <div class="col-md-4">
+            <div class="file-tree">
+                <h4>Log Files</h4>
+                <ul id="log-files-list">
+                    <!-- Dynamic log file structure will be populated here -->
+                </ul>
+                <button id="open-file-picker" class="btn btn-secondary mt-3">Open File Explorer</button>
+                <input type="file" id="file-picker" style="display: none;">
+            </div>
+        </div>
 
+        <!-- Log File Reader -->
+        <div class="col-md-8">
+            <div class="log-reader">
+                <h4>Log Viewer</h4>
+                <div id="log-content" class="log-viewer">
+                    Select a log file to view its contents.
+                </div>
+                <div id="json-tree-view" class="mt-3">
+                    <!-- JSON Tree view will be rendered here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JavaScript for search, file picker, tree view, and log viewer interaction -->
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        // Start search on button click
+        document.getElementById('start-search').addEventListener('click', function () {
+            document.getElementById('progress-bar').style.width = '0%';
+            document.getElementById('progress-bar').innerText = '0%';
+            document.getElementById('search-status').innerText = 'Starting search...';
+            document.getElementById('current-directory').innerText = 'Current Directory: Not started';
+
+            fetch('{{ url_for("start_search") }}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            }).then(response => response.json())
+              .then(data => {
+                console.log(data.message);
+                setTimeout(checkSearchStatus, 1000); // Start checking search status with a delay
+              });
+        });
+
+        // Check search status every second
+        function checkSearchStatus() {
+            fetch('{{ url_for("search_status") }}')
+                .then(response => response.json())
+                .then(data => {
+                    // Update progress bar
+                    document.getElementById('progress-bar').style.width = data.progress + '%';
+                    document.getElementById('progress-bar').innerText = data.progress + '%';
+                    document.getElementById('progress-bar').ariaValueNow = data.progress;
+                    document.getElementById('search-status').innerText = data.status;
+                    document.getElementById('current-directory').innerText = 'Current Directory: ' + data.status;
+
+                    if (data.found) {
+                        loadFileTree(); // Load file tree when search is complete
+                    } else if (data.progress < 100) {
+                        setTimeout(checkSearchStatus, 1000); // Continue checking if search not complete
+                    }
+                })
+                .catch(error => console.error('Error checking search status:', error));
+        }
+
+        // Load file tree function
+        function loadFileTree() {
+            fetch('{{ url_for("fetch_file_structure") }}')
+                .then(response => response.json())
+                .then(data => {
+                    const fileTree = document.getElementById('log-files-list');
+                    fileTree.innerHTML = ''; // Clear existing tree
+                    renderTree(data, fileTree); // Render new tree
+                });
+        }
+
+        // Recursive function to render file tree structure
+        function renderTree(items, parentElement) {
+            items.forEach(item => {
+                const li = document.createElement('li');
+                li.textContent = item.name;
+                li.dataset.path = item.path;
+                li.classList.add(item.type === 'directory' ? 'directory' : 'file');
+                parentElement.appendChild(li);
+
+                if (item.type === 'directory') {
+                    li.classList.add('collapsible');
+                    const childrenContainer = document.createElement('ul');
+                    childrenContainer.style.display = 'none'; // Initially hidden
+                    li.appendChild(childrenContainer);
+                    li.addEventListener('click', function(event) {
+                        event.stopPropagation(); // Prevent event bubbling
+                        childrenContainer.style.display = childrenContainer.style.display === 'none' ? 'block' : 'none';
+                        li.classList.toggle('expanded');
+                    });
+                    renderTree(item.children, childrenContainer);
+                } else {
+                    li.addEventListener('click', function() {
+                        document.querySelectorAll('#log-files-list .selected').forEach(el => el.classList.remove('selected'));
+                        li.classList.add('selected');
+                        fetch('{{ url_for("read_log_file") }}?path=' + encodeURIComponent(li.dataset.path))
+                            .then(response => response.text())
+                            .then(data => document.getElementById('log-content').textContent = data)
+                            .catch(error => console.error('Error fetching log file:', error));
+                    });
+                }
+            });
+        }
+
+        // File picker interaction
+        document.getElementById('open-file-picker').addEventListener('click', function () {
+            document.getElementById('file-picker').click(); // Open the file picker dialog
+        });
+
+        document.getElementById('file-picker').addEventListener('change', function (event) {
+            const file = event.target.files[0];
+            if (file) {
+                readFileContent(file); // Read selected file content
+            }
+        });
+
+        // Function to read file content
+        function readFileContent(file) {
+            const reader = new FileReader();
+            reader.onload = function (event) {
+                document.getElementById('log-content').textContent = event.target.result;
+                try {
+                    const jsonData = JSON.parse(event.target.result);
+                    renderJsonTree(jsonData, document.getElementById('json-tree-view'));
+                } catch (e) {
+                    document.getElementById('json-tree-view').innerText = "The selected file is not a JSON.";
+                }
+            };
+            reader.onerror = function (error) {
+                console.error('Error reading file:', error);
+            };
+            reader.readAsText(file);
+        }
+
+        // Recursive function to render a JSON tree view
+        function renderJsonTree(data, container) {
+            container.innerHTML = ''; // Clear previous content
+
+            function createNode(item, parentElement) {
+                const nodeElement = document.createElement('div');
+                nodeElement.classList.add('tree-node');
+
+                if (typeof item === 'object' && item !== null) {
+                    // It's an object or array
+                    const keys = Object.keys(item);
+                    keys.forEach(key => {
+                        const childElement = document.createElement('div');
+                        childElement.classList.add('tree-node');
+                        const label = document.createElement('span');
+                        label.classList.add('tree-label');
+                        label.textContent = `${key}: `;
+
+                        childElement.appendChild(label);
+                        nodeElement.appendChild(childElement);
+
+                        // Recursively render children
+                        createNode(item[key], childElement);
+                    });
+                } else {
+                    // It's a value
+                    const valueElement = document.createElement('span');
+                    valueElement.textContent = item;
+                    nodeElement.appendChild(valueElement);
+                }
+
+                parentElement.appendChild(nodeElement);
+            }
+
+            createNode(data, container);
+        }
+    });
+</script>
+
+<style>
+    /* Styles for file tree view */
+    .directory {
+        font-weight: bold;
+        cursor: pointer;
+        margin: 5px 0;
+    }
+
+    .file {
+        cursor: pointer;
+        margin: 5px 0;
+        padding-left: 20px; /* Indent files */
+    }
+
+    .collapsible::before {
+        content: '▶';
+        display: inline-block;
+        margin-right: 5px;
+    }
+
+    .expanded::before {
+        content: '▼';
+    }
+
+    /* Selected file highlight */
+    .selected {
+        background-color: #007bff !important;
+        color: #ffffff;
+    }
+
+    /* Log viewer styling */
+    .log-viewer {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 10px;
+        height: 600px;
+        overflow-y: auto; /* Scroll functionality for large files */
+        white-space: pre-wrap; /* Preserve whitespace and line breaks */
+        font-family: monospace; /* Monospace font for log content */
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    /* JSON tree view */
+    .tree-node {
+        margin-left: 20px;
+        margin-top: 5px;
+        cursor: pointer;
+    }
+
+    .tree-label {
+        font-weight: bold;
+        cursor: pointer;
+    }
+
+    .tree-node.collapsible .tree-label::before {
+        content: "▼";
+        display: inline-block;
+        margin-right: 5px;
+        transform: rotate(0deg);
+        transition: transform 0.3s ease-in-out; /* Smooth rotation transition */
+    }
+
+    .tree-node.collapsible.collapsed .tree-label::before {
+        transform: rotate(-90deg); /* Rotate arrow to indicate collapsed state */
+    }
+
+    .tree-node.collapsible > .tree-children {
+        display: none;
+        padding-left: 15px;
+    }
+
+    .tree-node.collapsible:not(.collapsed) > .tree-children {
+        display: block;
+    }
+</style>
+{% endblock %}

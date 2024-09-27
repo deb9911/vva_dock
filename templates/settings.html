@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <!-- Sidebar -->
+        <nav id="sidebar" class="col-md-3 col-lg-2 d-md-block bg-light sidebar">
+            <div class="position-sticky">
+                <ul class="nav flex-column">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#" onclick="showSettingsSection('general-settings')">General Settings</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" onclick="showSettingsSection('notifications-settings')">Notifications</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" onclick="showSettingsSection('privacy-settings')">Privacy</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" onclick="showSettingsSection('account-settings')">Account</a>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+
+        <!-- Main Content Area -->
+        <main class="col-md-9 ml-sm-auto col-lg-10 px-md-4">
+            <div id="settings-content">
+                <h1>Settings</h1>
+                <p>Please select a settings category from the sidebar.</p>
+
+                <!-- General Settings -->
+                <div id="general-settings" class="settings-section" style="display: none;">
+                    <h2>General Settings</h2>
+                    <form>
+                        <div class="form-group">
+                            <label for="language">Language</label>
+                            <select class="form-control" id="language">
+                                <option value="en">English</option>
+                                <option value="es">Spanish</option>
+                                <option value="fr">French</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="timezone">Timezone</label>
+                            <select class="form-control" id="timezone">
+                                <option value="utc">UTC</option>
+                                <option value="est">EST</option>
+                                <option value="pst">PST</option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Notifications Settings -->
+                <div id="notifications-settings" class="settings-section" style="display: none;">
+                    <h2>Notifications</h2>
+                    <form>
+                        <div class="form-group">
+                            <label>Receive Notifications</label>
+                            <div>
+                                <label class="radio-inline">
+                                    <input type="radio" name="notifications" value="yes" checked> Yes
+                                </label>
+                                <label class="radio-inline">
+                                    <input type="radio" name="notifications" value="no"> No
+                                </label>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Privacy Settings -->
+                <div id="privacy-settings" class="settings-section" style="display: none;">
+                    <h2>Privacy</h2>
+                    <form>
+                        <div class="form-group">
+                            <label>Profile Visibility</label>
+                            <div>
+                                <label class="radio-inline">
+                                    <input type="radio" name="visibility" value="public" checked> Public
+                                </label>
+                                <label class="radio-inline">
+                                    <input type="radio" name="visibility" value="private"> Private
+                                </label>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Account Settings -->
+                <div id="account-settings" class="settings-section" style="display: none;">
+                    <h2>Account</h2>
+                    <form>
+                        <div class="form-group">
+                            <label for="username">Username</label>
+                            <input type="text" class="form-control" id="username" value="john_doe">
+                        </div>
+                        <div class="form-group">
+                            <label for="password">Password</label>
+                            <input type="password" class="form-control" id="password">
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<!-- Add a script to handle showing/hiding sections -->
+<script>
+    function showSettingsSection(sectionId) {
+        // Hide all settings sections
+        const sections = document.getElementsByClassName('settings-section');
+        for (let i = 0; i < sections.length; i++) {
+            sections[i].style.display = 'none';
+        }
+
+        // Show the selected section
+        const selectedSection = document.getElementById(sectionId);
+        if (selectedSection) {
+            selectedSection.style.display = 'block';
+        }
+    }
+
+    // Optionally, show the first section by default
+    document.addEventListener("DOMContentLoaded", function () {
+        showSettingsSection('general-settings'); // Default section to show
+    });
+</script>
+{% endblock %}
