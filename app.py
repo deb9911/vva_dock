@@ -27,6 +27,12 @@ USERS = {
 # Lock for thread safety
 search_lock = threading.Lock()
 
+
+@app.route('/static_test')
+def static_test():
+    return render_template('static_test.html')
+
+
 # Authentication function
 def authenticate(username, password):
     """
@@ -36,6 +42,16 @@ def authenticate(username, password):
     :return: True if authenticated, else False
     """
     return USERS.get(username) == password
+
+
+@app.route('/test')
+def test():
+    return render_template('home.html', user_name="Test User", user_email="test@example.com",
+                           user_profile_image="profile.jpg", app_name="Test App",
+                           app_version="0.1", app_status="Testing", last_updated="2024-09-18",
+                           commands=["Test Command 1"], recent_activities=["Test Activity"])
+
+
 
 @app.route('/')
 def index():
@@ -63,9 +79,9 @@ def login():
 @app.route('/home')
 def home():
     # Check if the user is logged in
-    if 'logged_in' not in session or not session['logged_in']:
-        flash("You are not logged in.", "warning")
-        return redirect(url_for('index'))
+    # if 'logged_in' not in session or not session['logged_in']:
+    #     flash("You are not logged in.", "warning")
+    #     return redirect(url_for('index'))
     return render_template('home.html', user_name="John Doe", user_email=session.get('email'),
                            user_profile_image="profile.jpg", app_name="My Flask App",
                            app_version="1.0", app_status="Running", last_updated="2024-09-18",
