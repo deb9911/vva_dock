@@ -1,8 +1,9 @@
+/* General Styles */
 body {
-    font-family: sans-serif;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; /* Updated font */
     margin: 0;
     padding: 0;
-    height: 100vh;
+    min-height: 100vh; /* Ensures minimum height */
     display: flex;
     flex-direction: column;
     background-color: #f0f2f5; /* Light background color for better contrast */
@@ -56,6 +57,7 @@ footer {
     box-shadow: 0 -4px 8px rgba(0, 0, 0, 0.1);
 }
 
+/* Navigation Styles */
 .navbar-nav .nav-link {
     color: #007bff;
     transition: color 0.3s ease-in-out; /* Smooth transition */
@@ -70,6 +72,7 @@ footer {
     color: #0056b3; /* Active state color */
 }
 
+/* Command List Styles */
 .command-list {
     list-style: none;
     padding: 0;
@@ -88,6 +91,7 @@ footer {
     background-color: #f1f1f1; /* Lighter background on hover */
 }
 
+/* Info Box Styles */
 .info-box {
     background-color: #f8f9fa;
     padding: 20px;
@@ -98,7 +102,38 @@ footer {
     min-height: 200px;
 }
 
-/* New styles for the settings page */
+/* Login Page Styles */
+.card {
+    border: none;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Added shadow for depth */
+}
+
+.card-header {
+    background-color: #ffffff;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.card-body {
+    padding: 30px;
+}
+
+.card-footer {
+    background-color: #ffffff;
+    border-top: 1px solid #dee2e6;
+}
+
+.btn-primary {
+    background-color: #007bff;
+    border-color: #007bff;
+    transition: background-color 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+}
+
+.btn-primary:hover {
+    background-color: #0056b3;
+    box-shadow: 0 4px 12px rgba(0, 123, 255, 0.2); /* Hover effect */
+}
+
+/* Sidebar Styles */
 #sidebar {
     position: fixed;
     top: 60px; /* Adjusted top to align below the header */
@@ -190,7 +225,7 @@ footer {
     }
 }
 
-/* Styles for the debugging page */
+/* Debugging Page Styles */
 .file-tree {
     background-color: #f8f9fa;
     border: 1px solid #dee2e6;
@@ -288,4 +323,18 @@ footer {
 
 .tree-node.collapsible:not(.collapsed) > .tree-children {
     display: block;
+}
+
+/* Utility class for fixed centered layout */
+.centered-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+}
+
+.centered-card {
+    max-width: 400px;
+    width: 100%;
 }

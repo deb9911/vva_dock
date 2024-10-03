@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row">
+        <!-- Left column: Information panel (initially hidden) -->
+        <div class="col-md-8">
+            <div id="infoPanel" class="info-box" style="display: none;">
+                <h2>Package Information</h2>
+                <p id="packageDetails"></p>
+            </div>
+        </div>
+
+        <!-- Right column: Get Package button -->
+        <div class="col-md-4 text-right">
+            <button id="getPackageBtn" class="btn btn-primary">Get Package</button>
+        </div>
+    </div>
+</div>
+
+<!-- JavaScript to handle the button click and OS detection -->
+<script>
+    function getOperatingSystem() {
+        const userAgent = window.navigator.userAgent;
+        const platform = window.navigator.platform;
+        const macPlatforms = ['Macintosh', 'MacIntel', 'MacPPC', 'Mac68K'];
+        const winPlatforms = ['Win32', 'Win64', 'Windows', 'WinCE'];
+        const iosPlatforms = ['iPhone', 'iPad', 'iPod'];
+
+        if (winPlatforms.indexOf(platform) !== -1) {
+            return 'Windows';
+        } else if (macPlatforms.indexOf(platform) !== -1) {
+            return 'Mac';
+        } else if (iosPlatforms.indexOf(platform) !== -1) {
+            return 'iOS';
+        } else if (/Android/.test(userAgent)) {
+            return 'Android';
+        } else if (/Linux/.test(platform)) {
+            return 'Linux';
+        } else {
+            return 'Unknown';
+        }
+    }
+
+    document.getElementById("getPackageBtn").addEventListener("click", function() {
+        const os = getOperatingSystem();
+
+        if (os === 'Windows') {
+            // Proceed with the download
+            this.disabled = true;
+            this.textContent = "Processing...";
+
+            fetch('/download_package', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    const infoPanel = document.getElementById("infoPanel");
+                    document.getElementById("packageDetails").innerHTML = `
+                        <p>The package has been successfully downloaded and saved at the following location:</p>
+                        <p><strong>Package Path:</strong> ${data.package_path}</p>
+                    `;
+                    infoPanel.style.display = "block";
+                } else {
+                    alert("Error: " + data.message);
+                }
+            })
+            .catch(error => {
+                alert("An error occurred: " + error.message);
+            })
+            .finally(() => {
+                this.disabled = false;
+                this.textContent = "Get Package";
+            });
+
+        } else if (os === 'Linux' || os === 'Mac') {
+            alert('Package coming soon for ' + os + ' systems.');
+        } else if (os === 'Android') {
+            alert('Vaani is not yet ready for Android.');
+        } else if (os === 'iOS') {
+            alert('PKG getting ready for iOS.');
+        } else {
+            alert('Unsupported platform: ' + os);
+        }
+    });
+</script>
+{% endblock %}
