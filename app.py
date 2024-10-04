@@ -224,7 +224,8 @@ def start_search():
         SEARCH_STATUS['found'] = False
         LOG_DIRECTORY = None
 
-    search_thread = threading.Thread(target=search_system_for_directory, args=("Vani_Virtual-Assistant_pre_llm",))
+    # search_thread = threading.Thread(target=search_system_for_directory, args=("Vani_Virtual-Assistant_pre_llm",))
+    search_thread = threading.Thread(target=search_system_for_directory, args=("Vaani Virtual Assistant",))
     search_thread.start()
 
     return jsonify({'message': 'Search started'})
