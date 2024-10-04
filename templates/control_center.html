@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2>Control Center</h2>
+
+    <!-- Console Output Area -->
+    <div class="console-box" id="consoleOutput" style="height: 300px; overflow-y: auto; background-color: #f5f5f5; border: 1px solid #ccc; padding: 10px;">
+        <!-- Console output will be displayed here -->
+    </div>
+
+    <!-- Control Buttons -->
+    <div class="mt-3">
+        <button class="btn btn-success" id="startAppBtn">Start</button>
+        <button class="btn btn-danger" id="killAppBtn">Kill Application</button>
+    </div>
+</div>
+
+<script>
+    let intervalId;  // To store the interval ID
+
+    // Start application button
+    document.getElementById('startAppBtn').addEventListener('click', function() {
+        fetch('/start_application', { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                alert('Application started');
+                fetchConsoleOutput();  // Start fetching console output after the app starts
+            } else {
+                alert('Failed to start application');
+            }
+        });
+    });
+
+    // Function to fetch console output every second
+    function fetchConsoleOutput() {
+        if (intervalId) {
+            clearInterval(intervalId);  // Clear any previous interval if it exists
+        }
+
+        intervalId = setInterval(function() {
+            fetch('/get_console_output')
+            .then(response => response.json())
+            .then(data => {
+                const consoleDiv = document.getElementById('consoleOutput');
+                consoleDiv.innerHTML = '';  // Clear previous output
+
+                // Display each line of the console output
+                data.console_output.forEach(line => {
+                    const lineElement = document.createElement('p');
+                    lineElement.textContent = line;
+                    consoleDiv.appendChild(lineElement);
+                });
+
+                // Scroll the console output to the bottom
+                consoleDiv.scrollTop = consoleDiv.scrollHeight;
+
+                // Stop fetching if the process is finished
+                if (data.console_output.includes("Process finished")) {
+                    clearInterval(intervalId);
+                }
+            });
+        }, 1000);  // Poll every second
+    }
+
+    // Kill application button
+    document.getElementById('killAppBtn').addEventListener('click', function() {
+        fetch('/kill_application', { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                alert('Application killed');
+                clearInterval(intervalId);  // Stop fetching the console output when the app is killed
+            } else {
+                alert('Failed to kill application');
+            }
+        });
+    });
+</script>
+{% endblock %}

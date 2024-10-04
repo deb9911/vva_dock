@@ -1,5 +1,7 @@
+import subprocess
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 import secrets, os, time, threading, shutil, requests
+import zipfile
 
 # Generate a secure secret key for the Flask app
 secure_key = secrets.token_hex(16)
@@ -27,6 +29,7 @@ USERS = {
 # Lock for thread safety
 search_lock = threading.Lock()
 
+
 # Authentication function
 def authenticate(username, password):
     """
@@ -37,10 +40,12 @@ def authenticate(username, password):
     """
     return USERS.get(username) == password
 
+
 # Route to test static page rendering
 @app.route('/static_test')
 def static_test():
     return render_template('static_test.html')
+
 
 # Route for initial page
 @app.route('/')
@@ -49,6 +54,7 @@ def index():
     if 'logged_in' in session and session['logged_in']:
         return redirect(url_for('home'))
     return render_template('base.html')
+
 
 # Route for login functionality
 @app.route('/login', methods=['GET', 'POST'])
@@ -67,6 +73,7 @@ def login():
             return redirect(url_for('login'))
     return render_template('login.html')
 
+
 # Route for home page (only accessible if logged in)
 @app.route('/home')
 def home():
@@ -81,6 +88,7 @@ def home():
                            commands=["Command 1", "Command 2", "Command 3"],
                            recent_activities=["Logged in", "Updated settings"])
 
+
 # Route to log out
 @app.route('/logout')
 def logout():
@@ -89,6 +97,7 @@ def logout():
     session.pop('email', None)
     flash('You have been logged out.', 'info')
     return redirect(url_for('index'))
+
 
 # Background search function
 def search_system_for_directory(directory_name):
@@ -132,10 +141,79 @@ def search_system_for_directory(directory_name):
         if not SEARCH_STATUS['found']:
             SEARCH_STATUS['status'] = "No directory found with the specified name."
 
+
 # Route for debugging
-@app.route('/debugging')
-def debugging():
-    return render_template('debugging.html')
+@app.route('/control_panel')
+def control_panel():
+    return render_template('control_panel.html')
+
+
+@app.route('/debug')
+def debug():
+    # Render the existing debugging functionalities
+    return render_template('debug.html')
+
+
+@app.route('/control_center')
+def control_center():
+    return render_template('control_center.html')
+
+
+# Global variable to store console output
+console_output = []
+
+
+# Function to run the executable (setup.exe) in the background
+def run_application():
+    global console_output
+    try:
+        # Path to the setup.exe file
+        home_directory = os.path.expanduser("~")
+        exe_file_path = os.path.join(home_directory, "Vaani Virtual Assistant", "main_new.exe")
+
+        # Reset the console output
+        console_output = []
+
+        # Execute the .exe file and capture the output
+        process = subprocess.Popen([exe_file_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+        # Capture output in real-time
+        for line in iter(process.stdout.readline, ''):
+            console_output.append(line.strip())
+            print(line.strip())  # You can also log it in the console
+
+        # Wait for the process to complete
+        process.wait()
+        console_output.append("Process finished")
+
+    except Exception as e:
+        console_output.append(f"Error starting application: {e}")
+        print(f"Error starting application: {e}")
+
+
+# Route to handle the "Start" button click
+@app.route('/start_application', methods=['POST'])
+def start_application():
+    # Start the executable in a new thread
+    thread = threading.Thread(target=run_application)
+    thread.start()
+
+    return jsonify({'status': 'success', 'message': 'Application started successfully.'})
+
+
+# Route to get the console output
+@app.route('/get_console_output', methods=['GET'])
+def get_console_output():
+    global console_output
+    return jsonify({'console_output': console_output})
+
+
+# Route to handle the "Kill" button (optional)
+@app.route('/kill_application', methods=['POST'])
+def kill_application():
+    # Logic for killing the process (if applicable)
+    return jsonify({'status': 'success', 'message': 'Application terminated.'})
+
 
 # Route to start a background search
 @app.route('/start_search', methods=['POST'])
@@ -151,10 +229,12 @@ def start_search():
 
     return jsonify({'message': 'Search started'})
 
+
 # Route to fetch search status
 @app.route('/search_status')
 def search_status():
     return jsonify(SEARCH_STATUS)
+
 
 # Route to fetch log files
 @app.route('/fetch_log_files')
@@ -166,6 +246,7 @@ def fetch_log_files():
     else:
         return jsonify([])
 
+
 # Route to read a specific log file
 @app.route('/read_log_file')
 def read_log_file():
@@ -175,6 +256,7 @@ def read_log_file():
             content = file.read()
         return content
     return 'File not found or not accessible.', 404
+
 
 # Recursive function to fetch the file structure
 def get_file_structure(directory):
@@ -199,6 +281,7 @@ def get_file_structure(directory):
         pass  # Skip directories/files that cannot be accessed
     return structure
 
+
 # Route to fetch file structure of a directory
 @app.route('/fetch_file_structure')
 def fetch_file_structure():
@@ -219,11 +302,8 @@ def package_management():
 
 @app.route('/download_package', methods=['POST'])
 def download_package():
-    # Step 1: Define the package URLs
-    package_url = "https://1drv.ms/u/s!AqkAgHILBnzzg95Gc0gvj3gtP1Mt9w?e=uq9adq"
-    package_name = "Setup.exe"
-    cmd_json_url = "https://1drv.ms/u/s!AqkAgHILBnzzg95HI_6u1Al_jKsqqg?e=o1fRaw"
-    cmd_json_name = "cmd.json"
+    # Step 1: Use the GitHub Release direct download URL
+    zip_file_url = "https://github.com/deb9911/VVA_pre_llm/releases/download/v1/pilot_pkg.zip"
 
     # Step 2: Determine the user's home directory and create 'Vaani Virtual Assistant' folder
     home_directory = os.path.expanduser("~")
@@ -232,44 +312,69 @@ def download_package():
     if not os.path.exists(vaani_directory):
         os.makedirs(vaani_directory)
 
-    # Step 3: Download the package (.exe file)
-    package_path = os.path.join(vaani_directory, package_name)
+    # Step 3: Download the zip file
+    zip_file_path = os.path.join(vaani_directory, 'package.zip')
     try:
-        response = requests.get(package_url, stream=True)
-        with open(package_path, 'wb') as package_file:
-            shutil.copyfileobj(response.raw, package_file)
-    except Exception as e:
-        return jsonify({'status': 'error', 'message': f"Failed to download package: {str(e)}"}), 500
+        with requests.get(zip_file_url, stream=True) as response:
+            response.raise_for_status()  # Raise an error for bad HTTP responses
+            with open(zip_file_path, 'wb') as zip_file:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        zip_file.write(chunk)
+    except requests.exceptions.RequestException as e:
+        return jsonify({'status': 'error', 'message': f"Failed to download zip file: {str(e)}"}), 500
 
-    # Step 4: Create 'query_list' directory (no log directory)
-    query_directory = os.path.join(vaani_directory, "query_list")
+    # Step 4: Verify that the downloaded file is a valid zip file
+    if not zipfile.is_zipfile(zip_file_path):
+        return jsonify({'status': 'error', 'message': 'The downloaded file is not a valid zip file.'}), 500
 
+    # Step 5: Extract the contents of the zip file and handle the files
     try:
+        with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
+            zip_ref.extractall(vaani_directory)
+
+        # Step 6: Organize files: Move .exe file and cmd.json, and create the log and query_list directories
+        extracted_files = zip_ref.namelist()  # List all files in the zip
+        exe_file = next((f for f in extracted_files if f.endswith('.exe')), None)
+        cmd_json_file = next((f for f in extracted_files if 'cmd.json' in f), None)
+
+        if exe_file:
+            exe_file_path = os.path.join(vaani_directory, os.path.basename(exe_file))
+            shutil.move(os.path.join(vaani_directory, exe_file), exe_file_path)
+
+        # Create log and query_list directories
+        log_directory = os.path.join(vaani_directory, "log")
+        query_directory = os.path.join(vaani_directory, "query_list")
+
+        if not os.path.exists(log_directory):
+            os.makedirs(log_directory)
+
         if not os.path.exists(query_directory):
             os.makedirs(query_directory)
-    except Exception as e:
-        return jsonify({'status': 'error', 'message': f"Failed to create query_list directory: {str(e)}"}), 500
 
-    # Step 5: Download the cmd.json file and place it in the query_list directory
-    cmd_json_path = os.path.join(query_directory, cmd_json_name)
+        # Move cmd.json to query_list folder
+        if cmd_json_file:
+            shutil.move(os.path.join(vaani_directory, cmd_json_file), os.path.join(query_directory, 'cmd.json'))
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': f"Failed to extract or organize files: {str(e)}"}), 500
+
+    # Step 7: Delete the zip file after extraction
     try:
-        cmd_response = requests.get(cmd_json_url, stream=True)
-        with open(cmd_json_path, 'wb') as cmd_file:
-            shutil.copyfileobj(cmd_response.raw, cmd_file)
+        os.remove(zip_file_path)
     except Exception as e:
-        return jsonify({'status': 'error', 'message': f"Failed to download cmd.json: {str(e)}"}), 500
+        return jsonify({'status': 'error', 'message': f"Failed to delete zip file: {str(e)}"}), 500
 
-    # Step 6: Store the information in the session
-    session['setup_complete'] = True
-    session['package_path'] = package_path
-    session['query_directory'] = query_directory
-
-    # Step 7: Return success and file path details (only for Setup.exe)
     return jsonify({
         'status': 'success',
-        'message': 'Package downloaded successfully.',
-        'package_path': package_path
+        'message': 'Package downloaded, extracted, and organized successfully.',
+        'package_path': vaani_directory
     })
+
+
+@app.route('/progress', methods=['GET'])
+def get_progress():
+    progress = session.get('progress', 0)
+    return jsonify({'progress': progress})
 
 
 # Route for settings page

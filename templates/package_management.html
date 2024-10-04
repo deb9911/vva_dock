@@ -3,7 +3,6 @@
 {% block content %}
 <div class="container mt-5">
     <div class="row">
-        <!-- Left column: Information panel (initially hidden) -->
         <div class="col-md-8">
             <div id="infoPanel" class="info-box" style="display: none;">
                 <h2>Package Information</h2>
@@ -11,81 +10,60 @@
             </div>
         </div>
 
-        <!-- Right column: Get Package button -->
         <div class="col-md-4 text-right">
             <button id="getPackageBtn" class="btn btn-primary">Get Package</button>
         </div>
     </div>
+
+    <!-- Progress Bar -->
+    <div class="progress mt-3">
+        <div id="progressBar" class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+    </div>
 </div>
 
-<!-- JavaScript to handle the button click and OS detection -->
 <script>
-    function getOperatingSystem() {
-        const userAgent = window.navigator.userAgent;
-        const platform = window.navigator.platform;
-        const macPlatforms = ['Macintosh', 'MacIntel', 'MacPPC', 'Mac68K'];
-        const winPlatforms = ['Win32', 'Win64', 'Windows', 'WinCE'];
-        const iosPlatforms = ['iPhone', 'iPad', 'iPod'];
-
-        if (winPlatforms.indexOf(platform) !== -1) {
-            return 'Windows';
-        } else if (macPlatforms.indexOf(platform) !== -1) {
-            return 'Mac';
-        } else if (iosPlatforms.indexOf(platform) !== -1) {
-            return 'iOS';
-        } else if (/Android/.test(userAgent)) {
-            return 'Android';
-        } else if (/Linux/.test(platform)) {
-            return 'Linux';
-        } else {
-            return 'Unknown';
-        }
-    }
-
     document.getElementById("getPackageBtn").addEventListener("click", function() {
-        const os = getOperatingSystem();
+        this.disabled = true;
+        this.textContent = "Processing...";
 
-        if (os === 'Windows') {
-            // Proceed with the download
-            this.disabled = true;
-            this.textContent = "Processing...";
+        fetch('/download_package', { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                const infoPanel = document.getElementById("infoPanel");
+                document.getElementById("packageDetails").innerHTML = `
+                    <p>Package downloaded and extracted to: ${data.package_path}</p>
+                `;
+                infoPanel.style.display = "block";
+            } else {
+                alert("Error: " + data.message);
+            }
+        })
+        .catch(error => {
+            alert("An error occurred: " + error.message);
+        })
+        .finally(() => {
+            this.disabled = false;
+            this.textContent = "Get Package";
+        });
 
-            fetch('/download_package', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-            })
+        // Start progress bar monitoring
+        const progressBar = document.getElementById('progressBar');
+        const intervalId = setInterval(function() {
+            fetch('/progress')
             .then(response => response.json())
             .then(data => {
-                if (data.status === 'success') {
-                    const infoPanel = document.getElementById("infoPanel");
-                    document.getElementById("packageDetails").innerHTML = `
-                        <p>The package has been successfully downloaded and saved at the following location:</p>
-                        <p><strong>Package Path:</strong> ${data.package_path}</p>
-                    `;
-                    infoPanel.style.display = "block";
-                } else {
-                    alert("Error: " + data.message);
-                }
-            })
-            .catch(error => {
-                alert("An error occurred: " + error.message);
-            })
-            .finally(() => {
-                this.disabled = false;
-                this.textContent = "Get Package";
-            });
+                const progress = data.progress;
+                progressBar.style.width = progress + '%';
+                progressBar.setAttribute('aria-valuenow', progress);
+                progressBar.textContent = progress + '%';
 
-        } else if (os === 'Linux' || os === 'Mac') {
-            alert('Package coming soon for ' + os + ' systems.');
-        } else if (os === 'Android') {
-            alert('Vaani is not yet ready for Android.');
-        } else if (os === 'iOS') {
-            alert('PKG getting ready for iOS.');
-        } else {
-            alert('Unsupported platform: ' + os);
-        }
+                // Stop updating when 100% is reached
+                if (progress >= 100) {
+                    clearInterval(intervalId);
+                }
+            });
+        }, 1000);
     });
 </script>
 {% endblock %}
