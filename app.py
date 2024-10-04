@@ -30,15 +30,58 @@ USERS = {
 search_lock = threading.Lock()
 
 
-# Authentication function
 def authenticate(username, password):
-    """
-    Function to authenticate user credentials.
-    :param username: str - User's email
-    :param password: str - User's password
-    :return: True if authenticated, else False
-    """
+    """Check if the username and password match the stored user."""
     return USERS.get(username) == password
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        if authenticate(username, password):
+            session['logged_in'] = True
+            session['email'] = username
+            flash('Login successful!', 'success')
+            return redirect(url_for('home'))
+        else:
+            flash('Invalid credentials. Please try again.', 'danger')
+            return redirect(url_for('login'))
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    session.pop('logged_in', None)
+    session.pop('email', None)
+    flash('You have been logged out.', 'info')
+    return redirect(url_for('login'))
+
+# ======================
+# REGISTRATION (Future)
+# ======================
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        # You can add registration logic here in the future.
+        flash("Registration functionality coming soon!", "info")
+        return redirect(url_for('login'))
+    return render_template('register.html')
+
+# ======================
+# PROTECTING ROUTES
+# ======================
+
+def login_required(f):
+    """Decorator to protect routes that require login."""
+    from functools import wraps
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'logged_in' not in session or not session['logged_in']:
+            flash("You need to log in first.", "warning")
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
 
 
 # Route to test static page rendering
@@ -49,6 +92,7 @@ def static_test():
 
 # Route for initial page
 @app.route('/')
+@login_required
 def index():
     # Check if the user is logged in
     if 'logged_in' in session and session['logged_in']:
@@ -56,26 +100,9 @@ def index():
     return render_template('base.html')
 
 
-# Route for login functionality
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    # Handle login request
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        if authenticate(username, password):
-            session['logged_in'] = True
-            session['email'] = username
-            flash("Login successful!", "success")
-            return redirect(url_for('home'))
-        else:
-            flash("Invalid credentials, please try again.", "danger")
-            return redirect(url_for('login'))
-    return render_template('login.html')
-
-
 # Route for home page (only accessible if logged in)
 @app.route('/home')
+@login_required
 def home():
     # Check if the user is logged in
     # if 'logged_in' not in session or not session['logged_in']:
@@ -87,16 +114,6 @@ def home():
                            app_version="1.0", app_status="Running", last_updated="2024-09-18",
                            commands=["Command 1", "Command 2", "Command 3"],
                            recent_activities=["Logged in", "Updated settings"])
-
-
-# Route to log out
-@app.route('/logout')
-def logout():
-    # Handle logout request
-    session.pop('logged_in', None)
-    session.pop('email', None)
-    flash('You have been logged out.', 'info')
-    return redirect(url_for('index'))
 
 
 # Background search function
@@ -144,17 +161,20 @@ def search_system_for_directory(directory_name):
 
 # Route for debugging
 @app.route('/control_panel')
+@login_required
 def control_panel():
     return render_template('control_panel.html')
 
 
 @app.route('/debug')
+@login_required
 def debug():
     # Render the existing debugging functionalities
     return render_template('debug.html')
 
 
 @app.route('/control_center')
+@login_required
 def control_center():
     return render_template('control_center.html')
 
@@ -193,6 +213,7 @@ def run_application():
 
 # Route to handle the "Start" button click
 @app.route('/start_application', methods=['POST'])
+@login_required
 def start_application():
     # Start the executable in a new thread
     thread = threading.Thread(target=run_application)
@@ -203,6 +224,7 @@ def start_application():
 
 # Route to get the console output
 @app.route('/get_console_output', methods=['GET'])
+@login_required
 def get_console_output():
     global console_output
     return jsonify({'console_output': console_output})
@@ -210,6 +232,7 @@ def get_console_output():
 
 # Route to handle the "Kill" button (optional)
 @app.route('/kill_application', methods=['POST'])
+@login_required
 def kill_application():
     # Logic for killing the process (if applicable)
     return jsonify({'status': 'success', 'message': 'Application terminated.'})
@@ -217,6 +240,7 @@ def kill_application():
 
 # Route to start a background search
 @app.route('/start_search', methods=['POST'])
+@login_required
 def start_search():
     with search_lock:
         SEARCH_STATUS['progress'] = 0
@@ -233,12 +257,14 @@ def start_search():
 
 # Route to fetch search status
 @app.route('/search_status')
+@login_required
 def search_status():
     return jsonify(SEARCH_STATUS)
 
 
 # Route to fetch log files
 @app.route('/fetch_log_files')
+@login_required
 def fetch_log_files():
     if LOG_DIRECTORY and os.path.exists(LOG_DIRECTORY):
         log_files = [{'name': f, 'path': os.path.join(LOG_DIRECTORY, f)}
@@ -250,6 +276,7 @@ def fetch_log_files():
 
 # Route to read a specific log file
 @app.route('/read_log_file')
+@login_required
 def read_log_file():
     log_file_path = request.args.get('path')
     if log_file_path and os.path.isfile(log_file_path):
@@ -285,6 +312,7 @@ def get_file_structure(directory):
 
 # Route to fetch file structure of a directory
 @app.route('/fetch_file_structure')
+@login_required
 def fetch_file_structure():
     if LOG_DIRECTORY and os.path.exists(LOG_DIRECTORY):
         file_structure = get_file_structure(LOG_DIRECTORY)
@@ -294,6 +322,7 @@ def fetch_file_structure():
 
 
 @app.route('/package_management')
+@login_required
 def package_management():
     setup_complete = session.get('setup_complete', False)
     package_path = session.get('package_path', None)
@@ -302,6 +331,7 @@ def package_management():
 
 
 @app.route('/download_package', methods=['POST'])
+@login_required
 def download_package():
     # Step 1: Use the GitHub Release direct download URL
     zip_file_url = "https://github.com/deb9911/VVA_pre_llm/releases/download/v1/pilot_pkg.zip"
@@ -373,6 +403,7 @@ def download_package():
 
 
 @app.route('/progress', methods=['GET'])
+@login_required
 def get_progress():
     progress = session.get('progress', 0)
     return jsonify({'progress': progress})
@@ -380,11 +411,13 @@ def get_progress():
 
 # Route for settings page
 @app.route('/settings')
+@login_required
 def settings():
     return render_template('settings.html')
 
 # Route to add a new tab
 @app.route('/add_tab', methods=['GET', 'POST'])
+@login_required
 def add_tab():
     if request.method == 'POST':
         tab_name = request.form['tab_name']
