@@ -183,43 +183,42 @@ def control_center():
 console_output = []
 
 
-# Function to run the executable (setup.exe) in the background
 def run_application():
-    global console_output
+    global current_process
     try:
-        # Path to the setup.exe file
+        # Get the user's home directory
         home_directory = os.path.expanduser("~")
+
+        # Define the path to the .exe file
         exe_file_path = os.path.join(home_directory, "Vaani Virtual Assistant", "main_new.exe")
 
-        # Reset the console output
-        console_output = []
+        # Ensure the exe file exists before running
+        if not os.path.exists(exe_file_path):
+            print(f"Error: {exe_file_path} does not exist.")
+            return
 
-        # Execute the .exe file and capture the output
-        process = subprocess.Popen([exe_file_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        # Run the .exe file in a new console window, with the correct working directory
+        current_process = subprocess.Popen(
+            [exe_file_path],
+            cwd=os.path.join(home_directory, "Vaani Virtual Assistant"),  # Set working directory
+            creationflags=subprocess.CREATE_NEW_CONSOLE  # Create a new console window
+        )
 
-        # Capture output in real-time
-        for line in iter(process.stdout.readline, ''):
-            console_output.append(line.strip())
-            print(line.strip())  # You can also log it in the console
-
-        # Wait for the process to complete
-        process.wait()
-        console_output.append("Process finished")
+        # Wait for the process to complete (optional)
+        current_process.wait()
 
     except Exception as e:
-        console_output.append(f"Error starting application: {e}")
         print(f"Error starting application: {e}")
 
 
-# Route to handle the "Start" button click
+# Flask route to start the application
 @app.route('/start_application', methods=['POST'])
-@login_required
 def start_application():
-    # Start the executable in a new thread
+    # Start the application in a new thread
     thread = threading.Thread(target=run_application)
     thread.start()
 
-    return jsonify({'status': 'success', 'message': 'Application started successfully.'})
+    return jsonify({'status': 'success', 'message': 'Application started in a new console window.'})
 
 
 # Route to get the console output
@@ -330,21 +329,22 @@ def package_management():
     return render_template('package_management.html', setup_complete=setup_complete, package_path=package_path)
 
 
-@app.route('/download_package', methods=['POST'])
-@login_required
 def download_package():
-    # Step 1: Use the GitHub Release direct download URL
+    # URL to download the zip file
     zip_file_url = "https://github.com/deb9911/VVA_pre_llm/releases/download/v1/pilot_pkg.zip"
 
-    # Step 2: Determine the user's home directory and create 'Vaani Virtual Assistant' folder
+    # User's home directory and Vaani Virtual Assistant folder path
     home_directory = os.path.expanduser("~")
     vaani_directory = os.path.join(home_directory, "Vaani Virtual Assistant")
 
+    # Ensure the 'Vaani Virtual Assistant' directory exists
     if not os.path.exists(vaani_directory):
         os.makedirs(vaani_directory)
 
-    # Step 3: Download the zip file
+    # Path to the downloaded zip file
     zip_file_path = os.path.join(vaani_directory, 'package.zip')
+
+    # Step 1: Download the zip file
     try:
         with requests.get(zip_file_url, stream=True) as response:
             response.raise_for_status()  # Raise an error for bad HTTP responses
@@ -355,51 +355,38 @@ def download_package():
     except requests.exceptions.RequestException as e:
         return jsonify({'status': 'error', 'message': f"Failed to download zip file: {str(e)}"}), 500
 
-    # Step 4: Verify that the downloaded file is a valid zip file
-    if not zipfile.is_zipfile(zip_file_path):
-        return jsonify({'status': 'error', 'message': 'The downloaded file is not a valid zip file.'}), 500
-
-    # Step 5: Extract the contents of the zip file and handle the files
+    # Step 2: Extract the zip file
     try:
         with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
             zip_ref.extractall(vaani_directory)
 
-        # Step 6: Organize files: Move .exe file and cmd.json, and create the log and query_list directories
-        extracted_files = zip_ref.namelist()  # List all files in the zip
-        exe_file = next((f for f in extracted_files if f.endswith('.exe')), None)
-        cmd_json_file = next((f for f in extracted_files if 'cmd.json' in f), None)
-
-        if exe_file:
-            exe_file_path = os.path.join(vaani_directory, os.path.basename(exe_file))
-            shutil.move(os.path.join(vaani_directory, exe_file), exe_file_path)
-
-        # Create log and query_list directories
+        # Step 3: Create directories and move files
         log_directory = os.path.join(vaani_directory, "log")
         query_directory = os.path.join(vaani_directory, "query_list")
 
+        # Ensure directories exist
         if not os.path.exists(log_directory):
             os.makedirs(log_directory)
-
         if not os.path.exists(query_directory):
             os.makedirs(query_directory)
 
         # Move cmd.json to query_list folder
-        if cmd_json_file:
-            shutil.move(os.path.join(vaani_directory, cmd_json_file), os.path.join(query_directory, 'cmd.json'))
+        cmd_json = next((f for f in zip_ref.namelist() if 'cmd.json' in f), None)
+        if cmd_json:
+            shutil.move(os.path.join(vaani_directory, cmd_json), os.path.join(query_directory, 'cmd.json'))
+        else:
+            return jsonify({'status': 'error', 'message': 'cmd.json not found in the zip file'}), 500
+
     except Exception as e:
         return jsonify({'status': 'error', 'message': f"Failed to extract or organize files: {str(e)}"}), 500
 
-    # Step 7: Delete the zip file after extraction
+    # Step 4: Delete the zip file after extraction
     try:
         os.remove(zip_file_path)
     except Exception as e:
         return jsonify({'status': 'error', 'message': f"Failed to delete zip file: {str(e)}"}), 500
 
-    return jsonify({
-        'status': 'success',
-        'message': 'Package downloaded, extracted, and organized successfully.',
-        'package_path': vaani_directory
-    })
+    return jsonify({'status': 'success', 'message': 'Package downloaded, extracted, and organized successfully.'})
 
 
 @app.route('/progress', methods=['GET'])

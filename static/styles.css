@@ -18,6 +18,16 @@ header {
     padding: 0 20px;
 }
 
+.container {
+    padding: 20px;
+    margin-top: 20px;
+}
+
+.btn {
+    margin: 10px;
+}
+
+
 .main-content {
     flex-grow: 1;
     display: flex;
