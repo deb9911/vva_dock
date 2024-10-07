@@ -23,46 +23,66 @@
 
 <script>
     document.getElementById("getPackageBtn").addEventListener("click", function() {
-        this.disabled = true;
-        this.textContent = "Processing...";
+        const getPackageBtn = this;
+        const infoPanel = document.getElementById("infoPanel");
+        const packageDetails = document.getElementById("packageDetails");
+        const progressBar = document.getElementById('progressBar');
+        let intervalId;
 
+        // Disable button and show processing state
+        getPackageBtn.disabled = true;
+        getPackageBtn.textContent = "Processing...";
+
+        // Fetch package download
         fetch('/download_package', { method: 'POST' })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                const infoPanel = document.getElementById("infoPanel");
-                document.getElementById("packageDetails").innerHTML = `
-                    <p>Package downloaded and extracted to: ${data.package_path}</p>
-                `;
-                infoPanel.style.display = "block";
-            } else {
-                alert("Error: " + data.message);
-            }
-        })
-        .catch(error => {
-            alert("An error occurred: " + error.message);
-        })
-        .finally(() => {
-            this.disabled = false;
-            this.textContent = "Get Package";
-        });
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Failed to start package download.');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.status === 'success') {
+                    packageDetails.innerHTML = `
+                        <p>Package downloaded and extracted to: ${data.package_path}</p>
+                    `;
+                    infoPanel.style.display = "block";
+                } else {
+                    throw new Error(data.message);
+                }
+            })
+            .catch(error => {
+                alert("An error occurred: " + error.message);
+            })
+            .finally(() => {
+                getPackageBtn.disabled = false;
+                getPackageBtn.textContent = "Get Package";
+            });
 
         // Start progress bar monitoring
-        const progressBar = document.getElementById('progressBar');
-        const intervalId = setInterval(function() {
+        intervalId = setInterval(() => {
             fetch('/progress')
-            .then(response => response.json())
-            .then(data => {
-                const progress = data.progress;
-                progressBar.style.width = progress + '%';
-                progressBar.setAttribute('aria-valuenow', progress);
-                progressBar.textContent = progress + '%';
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to retrieve progress.');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    const progress = data.progress;
+                    progressBar.style.width = progress + '%';
+                    progressBar.setAttribute('aria-valuenow', progress);
+                    progressBar.textContent = progress + '%';
 
-                // Stop updating when 100% is reached
-                if (progress >= 100) {
+                    // Stop updating when 100% is reached
+                    if (progress >= 100) {
+                        clearInterval(intervalId);
+                    }
+                })
+                .catch(error => {
+                    alert("An error occurred while updating progress: " + error.message);
                     clearInterval(intervalId);
-                }
-            });
+                });
         }, 1000);
     });
 </script>

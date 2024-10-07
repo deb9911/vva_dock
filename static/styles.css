@@ -348,3 +348,17 @@ footer {
     max-width: 400px;
     width: 100%;
 }
+
+@media only screen and (max-width: 600px) {
+    body {
+        font-size: 14px; /* Make text smaller on smaller devices */
+    }
+
+    .container {
+        padding: 10px; /* Less padding on smaller screens */
+    }
+
+    .btn {
+        width: 100%; /* Full-width buttons on mobile */
+    }
+}

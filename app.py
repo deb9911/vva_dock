@@ -329,29 +329,32 @@ def package_management():
     return render_template('package_management.html', setup_complete=setup_complete, package_path=package_path)
 
 
+@app.route('/download_package', methods=['POST'])
+@login_required
 def download_package():
-    # URL to download the zip file
     zip_file_url = "https://github.com/deb9911/VVA_pre_llm/releases/download/v1/pilot_pkg.zip"
-
-    # User's home directory and Vaani Virtual Assistant folder path
     home_directory = os.path.expanduser("~")
     vaani_directory = os.path.join(home_directory, "Vaani Virtual Assistant")
+    zip_file_path = os.path.join(vaani_directory, 'package.zip')
 
     # Ensure the 'Vaani Virtual Assistant' directory exists
     if not os.path.exists(vaani_directory):
         os.makedirs(vaani_directory)
 
-    # Path to the downloaded zip file
-    zip_file_path = os.path.join(vaani_directory, 'package.zip')
-
     # Step 1: Download the zip file
     try:
+        session['progress'] = 0
         with requests.get(zip_file_url, stream=True) as response:
-            response.raise_for_status()  # Raise an error for bad HTTP responses
+            response.raise_for_status()
+            total_size = int(response.headers.get('content-length', 0))
+            downloaded_size = 0
+
             with open(zip_file_path, 'wb') as zip_file:
                 for chunk in response.iter_content(chunk_size=8192):
                     if chunk:
                         zip_file.write(chunk)
+                        downloaded_size += len(chunk)
+                        session['progress'] = int((downloaded_size / total_size) * 100)
     except requests.exceptions.RequestException as e:
         return jsonify({'status': 'error', 'message': f"Failed to download zip file: {str(e)}"}), 500
 
@@ -360,23 +363,17 @@ def download_package():
         with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
             zip_ref.extractall(vaani_directory)
 
-        # Step 3: Create directories and move files
+        # Step 3: Organize files into directories
         log_directory = os.path.join(vaani_directory, "log")
         query_directory = os.path.join(vaani_directory, "query_list")
+        os.makedirs(log_directory, exist_ok=True)
+        os.makedirs(query_directory, exist_ok=True)
 
-        # Ensure directories exist
-        if not os.path.exists(log_directory):
-            os.makedirs(log_directory)
-        if not os.path.exists(query_directory):
-            os.makedirs(query_directory)
-
-        # Move cmd.json to query_list folder
         cmd_json = next((f for f in zip_ref.namelist() if 'cmd.json' in f), None)
         if cmd_json:
             shutil.move(os.path.join(vaani_directory, cmd_json), os.path.join(query_directory, 'cmd.json'))
         else:
             return jsonify({'status': 'error', 'message': 'cmd.json not found in the zip file'}), 500
-
     except Exception as e:
         return jsonify({'status': 'error', 'message': f"Failed to extract or organize files: {str(e)}"}), 500
 
@@ -386,7 +383,9 @@ def download_package():
     except Exception as e:
         return jsonify({'status': 'error', 'message': f"Failed to delete zip file: {str(e)}"}), 500
 
-    return jsonify({'status': 'success', 'message': 'Package downloaded, extracted, and organized successfully.'})
+    session['progress'] = 100
+    return jsonify({'status': 'success', 'message': 'Package downloaded, extracted, and organized successfully.',
+                    'package_path': vaani_directory})
 
 
 @app.route('/progress', methods=['GET'])
