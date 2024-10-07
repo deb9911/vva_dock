@@ -14,7 +14,6 @@
     <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
     <!-- CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
 </head>
 
 <body>
@@ -55,7 +54,7 @@
             <div class="row">
                 {% if request.endpoint in ['control_panel', 'debug', 'control_center'] %}
                 <!-- Sidebar only visible on Control Panel-related pages -->
-                <div class="col-md-3">
+                <div class="col-12 col-md-3 mb-3">
                     <ul class="list-group">
                         <li class="list-group-item {% if request.endpoint == 'debug' %}active{% endif %}">
                             <a href="{{ url_for('debug') }}">Debug</a>
@@ -68,7 +67,7 @@
                 {% endif %}
 
                 <!-- Main content area -->
-                <div class="{% if request.endpoint in ['control_panel', 'debug', 'control_center'] %}col-md-9{% else %}col-md-12{% endif %}">
+                <div class="{% if request.endpoint in ['control_panel', 'debug', 'control_center'] %}col-12 col-md-9{% else %}col-12{% endif %}">
                     {% block content %}
                     <!-- Dynamic content will be injected here -->
                     {% endblock %}
