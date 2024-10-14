@@ -4,86 +4,85 @@
 <div class="container mt-5">
     <div class="row">
         <div class="col-md-8">
-            <div id="infoPanel" class="info-box" style="display: none;">
+            <div id="infoPanel" class="info-box" {% if not setup_complete %}style="display: none;"{% endif %}>
                 <h2>Package Information</h2>
-                <p id="packageDetails"></p>
+                <p id="packageDetails">
+                    {% if setup_complete %}
+                        Package found at: {{ package_path }}
+                    {% else %}
+                        No package found. Please download it.
+                    {% endif %}
+                </p>
             </div>
         </div>
 
         <div class="col-md-4 text-right">
-            <button id="getPackageBtn" class="btn btn-primary">Get Package</button>
+            {% if not setup_complete %}
+                <button id="getPackageBtn" class="btn btn-primary">Get Package</button>
+            {% endif %}
         </div>
     </div>
 
     <!-- Progress Bar -->
-    <div class="progress mt-3">
-        <div id="progressBar" class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
-    </div>
+    {% if not setup_complete %}
+        <div class="progress mt-3">
+            <div id="progressBar" class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+        </div>
+    {% endif %}
 </div>
 
 <script>
-    document.getElementById("getPackageBtn").addEventListener("click", function() {
-        const getPackageBtn = this;
+    document.addEventListener("DOMContentLoaded", function() {
+        const getPackageBtn = document.getElementById("getPackageBtn");
         const infoPanel = document.getElementById("infoPanel");
         const packageDetails = document.getElementById("packageDetails");
         const progressBar = document.getElementById('progressBar');
-        let intervalId;
 
-        // Disable button and show processing state
-        getPackageBtn.disabled = true;
-        getPackageBtn.textContent = "Processing...";
+        if (getPackageBtn) {
+            getPackageBtn.addEventListener("click", function() {
+                getPackageBtn.disabled = true;
+                getPackageBtn.textContent = "Processing...";
 
-        // Fetch package download
-        fetch('/download_package', { method: 'POST' })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Failed to start package download.');
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (data.status === 'success') {
-                    packageDetails.innerHTML = `
-                        <p>Package downloaded and extracted to: ${data.package_path}</p>
-                    `;
-                    infoPanel.style.display = "block";
-                } else {
-                    throw new Error(data.message);
-                }
-            })
-            .catch(error => {
-                alert("An error occurred: " + error.message);
-            })
-            .finally(() => {
-                getPackageBtn.disabled = false;
-                getPackageBtn.textContent = "Get Package";
+                // Fetch package download
+                fetch('/download_package', { method: 'POST' })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            packageDetails.textContent = `Package downloaded and extracted to: ${data.package_path}`;
+                            infoPanel.style.display = "block";
+                        } else {
+                            throw new Error(data.message);
+                        }
+                    })
+                    .catch(error => {
+                        alert("An error occurred: " + error.message);
+                    })
+                    .finally(() => {
+                        getPackageBtn.disabled = false;
+                        getPackageBtn.textContent = "Get Package";
+                    });
+
+                // Start progress bar monitoring
+                const intervalId = setInterval(() => {
+                    fetch('/progress')
+                        .then(response => response.json())
+                        .then(data => {
+                            const progress = data.progress;
+                            progressBar.style.width = progress + '%';
+                            progressBar.setAttribute('aria-valuenow', progress);
+                            progressBar.textContent = progress + '%';
+
+                            if (progress >= 100) {
+                                clearInterval(intervalId);
+                            }
+                        })
+                        .catch(error => {
+                            alert("An error occurred while updating progress: " + error.message);
+                            clearInterval(intervalId);
+                        });
+                }, 1000);
             });
-
-        // Start progress bar monitoring
-        intervalId = setInterval(() => {
-            fetch('/progress')
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Failed to retrieve progress.');
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    const progress = data.progress;
-                    progressBar.style.width = progress + '%';
-                    progressBar.setAttribute('aria-valuenow', progress);
-                    progressBar.textContent = progress + '%';
-
-                    // Stop updating when 100% is reached
-                    if (progress >= 100) {
-                        clearInterval(intervalId);
-                    }
-                })
-                .catch(error => {
-                    alert("An error occurred while updating progress: " + error.message);
-                    clearInterval(intervalId);
-                });
-        }, 1000);
+        }
     });
 </script>
 {% endblock %}

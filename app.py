@@ -174,18 +174,25 @@ def index():
 @app.route('/home')
 @login_required
 def home():
-    # Path to cmd.json file
-    home_directory = os.path.expanduser("~")
-    cmd_json_path = os.path.join(home_directory, "Vaani Virtual Assistant", "query_list", "cmd.json")
-
-    # Load commands from cmd.json
+    # Define paths using the user's home directory
+    user_home_dir = os.path.expanduser("~")
+    base_dir = os.path.join(user_home_dir, 'Vaani Virtual Assistant')
+    query_list_path = os.path.join(base_dir, 'query_list', 'cmd.json')
     commands = []
-    if os.path.exists(cmd_json_path):
+
+    # Check if base directory and cmd.json exist
+    if os.path.exists(base_dir) and os.path.exists(query_list_path):
         try:
-            with open(cmd_json_path, 'r') as file:
-                commands = json.load(file).get("commands", [])
-        except (json.JSONDecodeError, KeyError):
-            flash("Error loading commands.", "danger")
+            with open(query_list_path, 'r') as file:
+                data = json.load(file)
+                # Iterate over all lists in the JSON and aggregate commands
+                for key, cmd_list in data.items():
+                    if isinstance(cmd_list, list):
+                        commands.extend(cmd_list)
+        except json.JSONDecodeError:
+            flash('Error decoding cmd.json file', 'danger')
+        except Exception as e:
+            flash(f'Error loading commands: {str(e)}', 'danger')
     print(f'commands\t::\t{commands}')
     print("Accessing home - logged in:", session.get('logged_in'))
     return render_template('home.html', user_name="John Doe", user_email=session.get('email'),
@@ -403,10 +410,25 @@ def fetch_file_structure():
 @app.route('/package_management')
 @login_required
 def package_management():
-    setup_complete = session.get('setup_complete', False)
-    package_path = session.get('package_path', None)
+    # Define the base directory path in a generic way
+    user_home_dir = os.path.expanduser("~")
+    base_dir = os.path.join(user_home_dir, 'Vaani Virtual Assistant')
+    if base_dir:
+        print('Get It')
+    else:
+        print('Damn')
+    setup_complete = False
 
-    return render_template('package_management.html', setup_complete=setup_complete, package_path=package_path)
+    # Check if the 'Vaani Virtual Assistant' directory exists
+    # if os.path.exists(base_dir):
+    if base_dir:
+        setup_complete = True
+        package_path = base_dir
+    else:
+        package_path = None
+
+    return render_template('package_management.html', setup_complete=setup_complete,
+                           package_path=package_path)
 
 
 @app.route('/download_package', methods=['POST'])
