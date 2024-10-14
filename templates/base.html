@@ -10,37 +10,40 @@
     <meta name="author" content="Debashis Biswas">
     <meta name="keywords" content="Flask, Virtual Assistant, App Management">
     <title>VVA Dock</title>
-    <!-- Favicon -->
     <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
-    <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 
 <body>
     <header>
+        <div class="theme-toggle">
+            <button id="themeToggle" onclick="toggleTheme()" title="Toggle Dark Mode">🌞</button>
+        </div>
         <!-- Desktop Navbar (hidden on mobile) -->
         <nav class="navbar navbar-expand-lg navbar-light bg-light d-none d-lg-flex">
-            <a class="navbar-brand" href="{{ url_for('home') }}">Vaani Virtual Assistant</a>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav mr-auto">
-                    <li class="nav-item {% if request.endpoint == 'home' %}active{% endif %}">
-                        <a class="nav-link" href="{{ url_for('home') }}">Home</a>
-                    </li>
-                    <li class="nav-item {% if request.endpoint == 'control_panel' %}active{% endif %}">
-                        <a class="nav-link" href="{{ url_for('control_panel') }}">Control Panel</a>
-                    </li>
-                    <li class="nav-item {% if request.endpoint == 'package_management' %}active{% endif %}">
-                        <a class="nav-link" href="{{ url_for('package_management') }}">Package Management</a>
-                    </li>
-                    <li class="nav-item {% if request.endpoint == 'settings' %}active{% endif %}">
-                        <a class="nav-link" href="{{ url_for('settings') }}">Settings</a>
-                    </li>
-                    <li class="nav-item {% if request.endpoint == 'add_tab' %}active{% endif %}">
-                        <a class="nav-link" href="{{ url_for('add_tab') }}">Add Tab</a>
-                    </li>
-                </ul>
-                <div class="navbar-text user-profile">
-                    <a href="{{ url_for('logout') }}" class="nav-link">Logout</a>
+            <div class="container-fluid">
+                <a class="navbar-brand" href="{{ url_for('home') }}">Vaani Virtual Assistant</a>
+                <div class="collapse navbar-collapse" id="navbarNav">
+                    <ul class="navbar-nav mr-auto">
+                        <li class="nav-item {% if request.endpoint == 'home' %}active{% endif %}">
+                            <a class="nav-link" href="{{ url_for('home') }}">Home</a>
+                        </li>
+                        <li class="nav-item {% if request.endpoint == 'control_panel' %}active{% endif %}">
+                            <a class="nav-link" href="{{ url_for('control_panel') }}">Control Panel</a>
+                        </li>
+                        <li class="nav-item {% if request.endpoint == 'package_management' %}active{% endif %}">
+                            <a class="nav-link" href="{{ url_for('package_management') }}">Package Management</a>
+                        </li>
+                        <li class="nav-item {% if request.endpoint == 'settings' %}active{% endif %}">
+                            <a class="nav-link" href="{{ url_for('settings') }}">Settings</a>
+                        </li>
+                        <li class="nav-item {% if request.endpoint == 'add_tab' %}active{% endif %}">
+                            <a class="nav-link" href="{{ url_for('add_tab') }}">Add Tab</a>
+                        </li>
+                    </ul>
+                    <div class="d-flex justify-content-end">
+                        <a href="{{ url_for('logout') }}" class="nav-link">Logout</a>
+                    </div>
                 </div>
             </div>
         </nav>
@@ -71,7 +74,6 @@
         <div class="container-fluid">
             <div class="row">
                 {% if request.endpoint in ['control_panel', 'debug', 'control_center'] %}
-                <!-- Sidebar only visible on Control Panel-related pages -->
                 <div class="col-12 col-md-3 mb-3">
                     <ul class="list-group">
                         <li class="list-group-item {% if request.endpoint == 'debug' %}active{% endif %}">
@@ -83,11 +85,8 @@
                     </ul>
                 </div>
                 {% endif %}
-
-                <!-- Main content area -->
                 <div class="{% if request.endpoint in ['control_panel', 'debug', 'control_center'] %}col-12 col-md-9{% else %}col-12{% endif %}">
                     {% block content %}
-                    <!-- Dynamic content will be injected here -->
                     {% endblock %}
                 </div>
             </div>
@@ -104,11 +103,41 @@
             document.getElementById("mobileMenu").classList.toggle("active");
         }
     </script>
+    <script>
+        // Check the saved theme preference on page load
+        document.addEventListener('DOMContentLoaded', function () {
+        const theme = localStorage.getItem('theme') || 'light';
+        applyTheme(theme);
+        });
+
+        // Function to toggle between themes
+        function toggleTheme() {
+            const currentTheme = document.body.classList.contains('dark-mode') ? 'dark' : 'light';
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+            applyTheme(newTheme);
+            localStorage.setItem('theme', newTheme);
+        }
+
+        // Function to apply the chosen theme
+        function applyTheme(theme) {
+    const elementsToToggle = [
+        document.body,
+        ...document.querySelectorAll('.main-content, header, footer, .navbar-light.bg-light, .user-profile, .info-box, .command-list li, .file-tree, .log-reader, .mobile-menu-overlay, .mobile-menu-content')
+    ];
+
+    if (theme === 'dark') {
+        elementsToToggle.forEach(el => el.classList.add('dark-mode'));
+        document.getElementById('themeToggle').innerHTML = '🌜';
+    } else {
+        elementsToToggle.forEach(el => el.classList.remove('dark-mode'));
+        document.getElementById('themeToggle').innerHTML = '🌞';
+    }
+}
+    </script>
 
     <!-- JS Scripts for Bootstrap -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.1/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
 </body>
-
 </html>

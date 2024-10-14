@@ -5,11 +5,88 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
     <title>Register</title>
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .card {
+            border: none;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        .card-header {
+            background-color: #007bff;
+            color: #fff;
+            text-align: center;
+            font-size: 1.5rem;
+        }
+        .text-danger {
+            font-size: 0.9rem;
+        }
+    </style>
 </head>
 <body>
-    <h1>Register</h1>
-    <p>Registration functionality coming soon!</p>
-    <a href="{{ url_for('login') }}">Back to login</a>
+    <div class="container mt-5">
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">Register</div>
+                    <div class="card-body">
+                        <form method="POST" action="{{ url_for('register') }}">
+                            {{ form.hidden_tag() }}
+
+                            <!-- Username Field -->
+                            <div class="form-group">
+                                <label for="username">Username</label>
+                                {{ form.username(class="form-control", id="username", placeholder="Enter username") }}
+                                {% if form.username.errors %}
+                                    <div class="text-danger">{{ form.username.errors[0] }}</div>
+                                {% endif %}
+                            </div>
+
+                            <!-- Email Field -->
+                            <div class="form-group">
+                                <label for="email">Email</label>
+                                {{ form.email(class="form-control", id="email", placeholder="Enter email") }}
+                                {% if form.email.errors %}
+                                    <div class="text-danger">{{ form.email.errors[0] }}</div>
+                                {% endif %}
+                            </div>
+
+                            <!-- Password Field -->
+                            <div class="form-group">
+                                <label for="password">Password</label>
+                                {{ form.password(class="form-control", id="password", placeholder="Enter password") }}
+                                {% if form.password.errors %}
+                                    <div class="text-danger">{{ form.password.errors[0] }}</div>
+                                {% endif %}
+                            </div>
+
+                            <!-- Confirm Password Field -->
+                            <div class="form-group">
+                                <label for="confirm_password">Confirm Password</label>
+                                {{ form.confirm_password(class="form-control", id="confirm_password", placeholder="Confirm password") }}
+                                {% if form.confirm_password.errors %}
+                                    <div class="text-danger">{{ form.confirm_password.errors[0] }}</div>
+                                {% endif %}
+                            </div>
+
+                            <!-- Submit Button -->
+                            <button type="submit" class="btn btn-primary btn-block">Register</button>
+                        </form>
+
+                        <!-- Back to Login Link -->
+                        <div class="text-center mt-3">
+                            <a href="{{ url_for('login') }}">Back to Login</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS and dependencies -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.3/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
 </body>
 </html>
-

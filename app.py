@@ -1,13 +1,26 @@
 import subprocess
+from functools import wraps
+
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
+from flask_wtf import FlaskForm
+from wtforms import StringField, PasswordField, SubmitField
+from wtforms.validators import DataRequired, Email, EqualTo, Length
+from flask_sqlalchemy import SQLAlchemy
+from werkzeug.security import generate_password_hash, check_password_hash
 import secrets, os, time, threading, shutil, requests
-import zipfile
+import zipfile, json
 
 # Generate a secure secret key for the Flask app
 secure_key = secrets.token_hex(16)
 
 app = Flask(__name__)
 app.secret_key = secure_key  # Necessary for session management
+app.config['SECRET_KEY'] = secure_key
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Options: 'Lax', 'Strict', or 'None'
+app.config['SESSION_COOKIE_SECURE'] = True     # Use True only if using HTTPS
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
 
 # Initialize variables to store search status and log directory
 SEARCH_STATUS = {'progress': 0, 'status': 'Searching...', 'found': False}
@@ -21,19 +34,61 @@ SEARCH_DIRECTORIES = [
     '/var/log',  # System logs (if needed)
 ]
 
-# A simple user store with emails and passwords
-USERS = {
-    'user@example.com': 'password123'
-}
-
 # Lock for thread safety
 search_lock = threading.Lock()
+# Initialize database (run once to create tables)
+with app.app_context():
+    db.create_all()
 
 
+@app.route('/test_session')
+def test_session():
+    session['test'] = 'This is a test'
+    return 'Session set'
+
+
+@app.route('/get_session')
+def get_session():
+    return session.get('test', 'Session not found')
+
+
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(150), unique=True, nullable=False)
+    password_hash = db.Column(db.String(128), nullable=False)
+
+    def set_password(self, password):
+        """Hashes the password and stores it in the password_hash field."""
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        """Checks the hashed password."""
+        return check_password_hash(self.password_hash, password)
+
+
+# Form class for registration
+class RegistrationForm(FlaskForm):
+    username = StringField('Username', validators=[DataRequired(), Length(min=4, max=25)])
+    email = StringField('Email', validators=[DataRequired(), Email()])
+    password = PasswordField('Password', validators=[DataRequired(), Length(min=6)])
+    confirm_password = PasswordField('Confirm Password', validators=[DataRequired(), EqualTo('password')])
+    submit = SubmitField('Register')
+
+
+# Form class for login
+class LoginForm(FlaskForm):
+    username = StringField('Username', validators=[DataRequired()])
+    password = PasswordField('Password', validators=[DataRequired()])
+    submit = SubmitField('Login')
+
+
+# Update authenticate function to query the database
 def authenticate(username, password):
-    """Check if the username and password match the stored user."""
-    return USERS.get(username) == password
+    user = User.query.filter_by(email=username).first()
+    return user and user.check_password(password)
 
+
+@app.route('/login', methods=['GET', 'POST'])
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -45,9 +100,23 @@ def login():
             flash('Login successful!', 'success')
             return redirect(url_for('home'))
         else:
-            flash('Invalid credentials. Please try again.', 'danger')
-            return redirect(url_for('login'))
+            flash('User not found. Please log in again.', 'danger')
     return render_template('login.html')
+
+
+
+# @app.route('/login', methods=['GET', 'POST'])
+# def login():
+#     print("Form data:", request.form)
+#     print("Session data after login:", session)
+#     if request.method == 'POST':
+#         session['logged_in'] = True
+#         session['email'] = 'test@example.com'
+#         flash('Login successful!', 'success')
+#         return redirect(url_for('home'))
+#     return render_template('login.html')
+
+
 
 @app.route('/logout')
 def logout():
@@ -62,32 +131,34 @@ def logout():
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-    if request.method == 'POST':
-        # You can add registration logic here in the future.
-        flash("Registration functionality coming soon!", "info")
+    form = RegistrationForm()
+    if form.validate_on_submit():
+        # Hash the password and save the user
+        new_user = User(email=form.email.data)
+        new_user.set_password(form.password.data)
+        db.session.add(new_user)
+        db.session.commit()
+        flash('Registration successful! You can now log in.', 'success')
         return redirect(url_for('login'))
-    return render_template('register.html')
+    return render_template('register.html', form=form)
+
+
 
 # ======================
 # PROTECTING ROUTES
 # ======================
 
+
 def login_required(f):
-    """Decorator to protect routes that require login."""
-    from functools import wraps
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if 'logged_in' not in session or not session['logged_in']:
+        if not session.get('logged_in'):
             flash("You need to log in first.", "warning")
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
 
 
-# Route to test static page rendering
-@app.route('/static_test')
-def static_test():
-    return render_template('static_test.html')
 
 
 # Route for initial page
@@ -100,19 +171,28 @@ def index():
     return render_template('base.html')
 
 
-# Route for home page (only accessible if logged in)
 @app.route('/home')
 @login_required
 def home():
-    # Check if the user is logged in
-    # if 'logged_in' not in session or not session['logged_in']:
-    #     flash("You are not logged in.", "warning")
-    #     return redirect(url_for('index'))
+    # Path to cmd.json file
+    home_directory = os.path.expanduser("~")
+    cmd_json_path = os.path.join(home_directory, "Vaani Virtual Assistant", "query_list", "cmd.json")
 
+    # Load commands from cmd.json
+    commands = []
+    if os.path.exists(cmd_json_path):
+        try:
+            with open(cmd_json_path, 'r') as file:
+                commands = json.load(file).get("commands", [])
+        except (json.JSONDecodeError, KeyError):
+            flash("Error loading commands.", "danger")
+    print(f'commands\t::\t{commands}')
+    print("Accessing home - logged in:", session.get('logged_in'))
     return render_template('home.html', user_name="John Doe", user_email=session.get('email'),
                            user_profile_image="profile.jpg", app_name="My Flask App",
                            app_version="1.0", app_status="Running", last_updated="2024-09-18",
-                           commands=["Command 1", "Command 2", "Command 3"],
+                           # commands=["Command 1", "Command 2", "Command 3"],
+                           commands=commands,
                            recent_activities=["Logged in", "Updated settings"])
 
 
@@ -401,6 +481,7 @@ def get_progress():
 def settings():
     return render_template('settings.html')
 
+
 # Route to add a new tab
 @app.route('/add_tab', methods=['GET', 'POST'])
 @login_required
@@ -415,7 +496,8 @@ def add_tab():
 
 
 if __name__ == '__main__':
-    # app.run(debug=True, host='192.168.56.1', port=5000, threaded=True)
+    with app.app_context():
+        db.create_all()  # Create database tables if they don't exist
     app.run(debug=True, host='0.0.0.0', port=5000, threaded=True)
     # app.run(debug=True)
     # app.run(host='127.0.0.1', debug=True)

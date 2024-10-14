@@ -224,14 +224,18 @@ footer {
         margin: 0;
         padding: 10px;
     }
+
+    .user-profile {
+        position: relative;
+        text-align: center;
+        margin-top: 10px;
+        top: auto;
+        right: auto;
+        box-shadow: none;
+    }
 }
 
 @media (max-width: 576px) {
-    .user-profile {
-        position: static;
-        margin-top: 15px;
-    }
-
     .navbar-nav .nav-item {
         text-align: center;
     }
@@ -354,6 +358,7 @@ footer {
     width: 100%;
 }
 
+/* Mobile Menu Styles */
 @media only screen and (max-width: 600px) {
     body {
         font-size: 14px;
@@ -374,7 +379,6 @@ footer {
     }
 }
 
-/* Hide desktop navbar on small screens */
 @media (max-width: 992px) {
     .navbar {
         display: none;
@@ -397,7 +401,7 @@ footer {
     }
 }
 
-/* Mobile menu overlay */
+/* Mobile Menu Overlay */
 .mobile-menu-overlay {
     height: 100%;
     width: 0;
@@ -405,7 +409,7 @@ footer {
     z-index: 1;
     top: 0;
     left: 0;
-    background-color: rgba(0,0,0,0.7);
+    background-color: rgba(0, 0, 0, 0.7);
     overflow-x: hidden;
     transition: 0.5s;
     display: none;
@@ -443,5 +447,83 @@ footer {
     top: 20px;
     right: 25px;
     font-size: 36px;
+}
+
+/* Dark Mode Styles */
+body.dark-mode {
+    background-color: #181818;
+    color: #e0e0e0;
+}
+
+header.dark-mode, .main-content.dark-mode, footer.dark-mode {
+    background-color: #282828;
+    color: #e0e0e0;
+}
+
+.navbar-light.bg-light.dark-mode {
+    background-color: #333333;
+}
+
+.nav-link.dark-mode {
+    color: #b3b3b3;
+}
+
+.nav-link.dark-mode:hover {
+    color: #ffffff;
+}
+
+.user-profile.dark-mode {
+    background-color: #333333;
+    color: #e0e0e0;
+}
+
+.info-box.dark-mode, .command-list li.dark-mode, .file-tree.dark-mode, .log-reader.dark-mode {
+    background-color: #333333;
+    color: #e0e0e0;
+    border-color: #444444;
+}
+
+.theme-toggle {
+    position: absolute;
+    top: 15px;
+    right: 80px;
+}
+
+#themeToggle {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+}
+
+/* More Contrast for Dark Mode Elements */
+.navbar-light.bg-light.dark-mode {
+    background-color: #1f1f1f;
+}
+
+.mobile-menu-content.dark-mode {
+    background-color: #222222;
+}
+
+footer.dark-mode {
+    background-color: #1f1f1f;
+}
+
+/* Dark Mode for Mobile Menu */
+.mobile-menu-overlay.dark-mode {
+    background-color: rgba(0, 0, 0, 0.8);
+}
+
+.mobile-menu-content.dark-mode {
+    background-color: #333333;
+    color: #e0e0e0;
+}
+
+.mobile-menu-content a.dark-mode {
+    color: #e0e0e0;
+}
+
+.mobile-menu-content a.dark-mode:hover {
+    color: #ffffff;
 }
 

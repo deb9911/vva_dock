@@ -18,6 +18,7 @@
                 <div class="card-body">
                     <form method="POST" action="{{ url_for('login') }}">
                         <div class="form-group">
+                            <p>Login URL: {{ url_for('login') }}</p>
                             <label for="username">Email</label>
                             <input type="email" class="form-control" id="username" name="username" placeholder="Enter your email" required>
                         </div>
