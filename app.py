@@ -27,11 +27,15 @@ SEARCH_STATUS = {'progress': 0, 'status': 'Searching...', 'found': False}
 LOG_DIRECTORY = None
 
 # Directories to search (you can add/remove directories as needed)
+# Dynamically fetch the user's home directory
+user_home_dir = os.path.expanduser("~")
+
+# Update the search directories to be relative to the user's home directory
 SEARCH_DIRECTORIES = [
-    '/home',  # User home directories
-    '/usr/local',  # Common location for user-installed software
-    '/opt',  # Optional application software packages
-    '/var/log',  # System logs (if needed)
+    os.path.join(user_home_dir, ''),       # User's home directory
+    os.path.join(user_home_dir, 'Documents'),  # Common directory for documents
+    os.path.join(user_home_dir, 'Downloads'),  # Common directory for downloads
+    os.path.join(user_home_dir, 'Desktop'),    # Common directory for desktop items
 ]
 
 # Lock for thread safety
@@ -203,7 +207,6 @@ def home():
                            recent_activities=["Logged in", "Updated settings"])
 
 
-# Background search function
 def search_system_for_directory(directory_name):
     global SEARCH_STATUS, LOG_DIRECTORY
 
@@ -228,7 +231,7 @@ def search_system_for_directory(directory_name):
                     SEARCH_STATUS['status'] = f"Searching in: {root}"
                 for dir_name in dirs:
                     if dir_name == directory_name:
-                        potential_path = os.path.join(root, dir_name, 'dist')
+                        potential_path = os.path.join(root, dir_name)
                         if os.path.exists(potential_path):
                             with search_lock:
                                 LOG_DIRECTORY = potential_path
@@ -410,22 +413,16 @@ def fetch_file_structure():
 @app.route('/package_management')
 @login_required
 def package_management():
-    # Define the base directory path in a generic way
-    user_home_dir = os.path.expanduser("~")
-    base_dir = os.path.join(user_home_dir, 'Vaani Virtual Assistant')
-    if base_dir:
-        print('Get It')
-    else:
-        print('Damn')
-    setup_complete = False
+    home_directory = os.path.expanduser("~")
+    vaani_directory = os.path.join(home_directory, "Vaani Virtual Assistant")
 
-    # Check if the 'Vaani Virtual Assistant' directory exists
-    # if os.path.exists(base_dir):
-    if base_dir:
-        setup_complete = True
-        package_path = base_dir
-    else:
-        package_path = None
+    # Check if the package path exists
+    setup_complete = os.path.exists(vaani_directory) and os.path.exists(os.path.join(vaani_directory, 'main_new.exe'))
+    package_path = vaani_directory if setup_complete else None
+
+    # Update the session for frontend access
+    session['setup_complete'] = setup_complete
+    session['package_path'] = package_path
 
     return render_template('package_management.html', setup_complete=setup_complete,
                            package_path=package_path)
@@ -471,11 +468,25 @@ def download_package():
         os.makedirs(log_directory, exist_ok=True)
         os.makedirs(query_directory, exist_ok=True)
 
+        # Move cmd.json to query_list directory
         cmd_json = next((f for f in zip_ref.namelist() if 'cmd.json' in f), None)
         if cmd_json:
             shutil.move(os.path.join(vaani_directory, cmd_json), os.path.join(query_directory, 'cmd.json'))
         else:
             return jsonify({'status': 'error', 'message': 'cmd.json not found in the zip file'}), 500
+
+        # Move main_new.exe to the vaani_directory (main directory)
+        main_exe = next((f for f in zip_ref.namelist() if 'main_new.exe' in f), None)
+        if main_exe:
+            shutil.move(os.path.join(vaani_directory, main_exe), os.path.join(vaani_directory, 'main_new.exe'))
+        else:
+            return jsonify({'status': 'error', 'message': 'main_new.exe not found in the zip file'}), 500
+
+        # Remove the extracted 'dist' directory if it exists
+        dist_directory = os.path.join(vaani_directory, 'dist')
+        if os.path.exists(dist_directory):
+            shutil.rmtree(dist_directory)
+
     except Exception as e:
         return jsonify({'status': 'error', 'message': f"Failed to extract or organize files: {str(e)}"}), 500
 
