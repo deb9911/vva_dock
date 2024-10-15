@@ -12,7 +12,6 @@ import zipfile, json
 
 # Generate a secure secret key for the Flask app
 secure_key = secrets.token_hex(16)
-
 app = Flask(__name__)
 app.secret_key = secure_key  # Necessary for session management
 app.config['SECRET_KEY'] = secure_key
@@ -60,6 +59,7 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(150), unique=True, nullable=False)
     password_hash = db.Column(db.String(128), nullable=False)
+    token = db.Column(db.String(64), unique=True, nullable=False)
 
     def set_password(self, password):
         """Hashes the password and stores it in the password_hash field."""
@@ -121,7 +121,6 @@ def login():
 #     return render_template('login.html')
 
 
-
 @app.route('/logout')
 def logout():
     session.pop('logged_in', None)
@@ -133,6 +132,7 @@ def logout():
 # REGISTRATION (Future)
 # ======================
 
+
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     form = RegistrationForm()
@@ -140,12 +140,12 @@ def register():
         # Hash the password and save the user
         new_user = User(email=form.email.data)
         new_user.set_password(form.password.data)
+        new_user.token = secrets.token_hex(32)
         db.session.add(new_user)
         db.session.commit()
         flash('Registration successful! You can now log in.', 'success')
         return redirect(url_for('login'))
     return render_template('register.html', form=form)
-
 
 
 # ======================
@@ -163,6 +163,16 @@ def login_required(f):
     return decorated_function
 
 
+@app.route('/validate_token', methods=['POST'])
+def validate_token():
+    data = request.get_json()
+    token = data.get('token')
+    # Logic to validate the token, e.g., check against the database
+    user = User.query.filter_by(token=token).first()
+    if user:
+        return jsonify({"status": "valid"})
+    else:
+        return jsonify({"status": "invalid", "message": "Token is invalid."}), 401
 
 
 # Route for initial page
@@ -431,6 +441,11 @@ def package_management():
 @app.route('/download_package', methods=['POST'])
 @login_required
 def download_package():
+    user = User.query.filter_by(email=session.get('email')).first()
+    if not user:
+        flash("User not found.", "danger")
+        return redirect(url_for('login'))
+
     zip_file_url = "https://github.com/deb9911/VVA_pre_llm/releases/download/v1/pilot_pkg.zip"
     home_directory = os.path.expanduser("~")
     vaani_directory = os.path.join(home_directory, "Vaani Virtual Assistant")
@@ -461,6 +476,14 @@ def download_package():
     try:
         with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
             zip_ref.extractall(vaani_directory)
+
+        # Write token to a configuration file
+        # config_path = os.path.join(vaani_directory, 'user_config.json')
+        config_path = os.path.join(vaani_directory, 'user_token.json')
+        with open(config_path, 'w') as config_file:
+            json.dump({'token': user.token}, config_file)
+
+
 
         # Step 3: Organize files into directories
         log_directory = os.path.join(vaani_directory, "log")
