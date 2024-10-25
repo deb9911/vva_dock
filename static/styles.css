@@ -527,3 +527,40 @@ footer.dark-mode {
     color: #ffffff;
 }
 
+/* Styles for the metro-style cards */
+.metro-card {
+    background-color: #007bff;
+    color: white;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.metro-card h3, .metro-card h4 {
+    color: white;
+}
+
+.metro-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+}
+
+.metro-card ul {
+    padding-left: 0;
+    list-style-type: none;
+}
+
+.metro-card ul li {
+    background-color: #ffffff;
+    color: #007bff;
+    padding: 10px;
+    border-radius: 5px;
+    margin-bottom: 10px;
+    transition: background-color 0.3s ease;
+}
+
+.metro-card ul li:hover {
+    background-color: #f0f0f0;
+}

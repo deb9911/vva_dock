@@ -1,18 +1,31 @@
+import json
+import os
+import requests
+import secrets
+import shutil
 import subprocess
+import threading
+import time
+import zipfile
 from functools import wraps
+import psutil
+import platform
 
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
-from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, SubmitField
-from wtforms.validators import DataRequired, Email, EqualTo, Length
 from flask_sqlalchemy import SQLAlchemy
+from flask_wtf import FlaskForm
+from flask_cors import CORS
+from flask_migrate import Migrate
 from werkzeug.security import generate_password_hash, check_password_hash
-import secrets, os, time, threading, shutil, requests
-import zipfile, json
+from wtforms import (StringField, PasswordField, SubmitField, StringField, TextAreaField, DateTimeField,
+                     SubmitField, SelectField)
+from wtforms.validators import DataRequired, Email, EqualTo, Length
+from datetime import datetime
 
 # Generate a secure secret key for the Flask app
 secure_key = secrets.token_hex(16)
 app = Flask(__name__)
+CORS(app)
 app.secret_key = secure_key  # Necessary for session management
 app.config['SECRET_KEY'] = secure_key
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Options: 'Lax', 'Strict', or 'None'
@@ -20,6 +33,8 @@ app.config['SESSION_COOKIE_SECURE'] = True     # Use True only if using HTTPS
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
+
+migrate = Migrate(app, db)
 
 # Initialize variables to store search status and log directory
 SEARCH_STATUS = {'progress': 0, 'status': 'Searching...', 'found': False}
@@ -85,6 +100,69 @@ class LoginForm(FlaskForm):
     password = PasswordField('Password', validators=[DataRequired()])
     submit = SubmitField('Login')
 
+
+class TaskForm(FlaskForm):
+    title = StringField('Task Title', validators=[DataRequired()])
+    description = TextAreaField('Task Description')
+    due_date = DateTimeField('Due Date', format='%Y-%m-%d %H:%M:%S')
+    priority = SelectField('Priority', choices=[('High', 'High'), ('Medium', 'Medium'), ('Low', 'Low')])
+    submit = SubmitField('Add Task')
+
+
+class ReminderForm(FlaskForm):
+    title = StringField('Reminder Title', validators=[DataRequired()])
+    reminder_time = DateTimeField('Reminder Time', format='%Y-%m-%d %H:%M:%S', validators=[DataRequired()])
+    repeat = SelectField('Repeat', choices=[('None', 'None'), ('Daily', 'Daily'), ('Weekly', 'Weekly')])
+    submit = SubmitField('Set Reminder')
+
+
+class NoteForm(FlaskForm):
+    title = StringField('Note Title', validators=[DataRequired()])
+    content = TextAreaField('Note Content', validators=[DataRequired()])
+    tags = StringField('Tags (Comma-separated)')
+    submit = SubmitField('Save Note')
+
+
+class CustomCommandForm(FlaskForm):
+    command_name = StringField('Command Name', validators=[DataRequired()])
+    command_action = TextAreaField('Command Action', validators=[DataRequired()])
+    voice_trigger = StringField('Voice Trigger')
+    schedule_time = DateTimeField('Schedule Time', format='%Y-%m-%d %H:%M:%S', validators=[DataRequired()])
+    submit = SubmitField('Add Command')
+
+
+class Task(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(150), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    due_date = db.Column(db.DateTime, nullable=True)
+    priority = db.Column(db.String(50), nullable=True)
+    status = db.Column(db.String(50), default='Pending')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+
+class Reminder(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(150), nullable=False)
+    reminder_time = db.Column(db.DateTime, nullable=False)
+    repeat = db.Column(db.String(50), nullable=True)  # E.g., Daily, Weekly, Monthly
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+
+class Note(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(150), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    tags = db.Column(db.String(150), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+
+class CustomCommand(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    command_name = db.Column(db.String(150), nullable=False)
+    command_action = db.Column(db.String(500), nullable=False)
+    voice_trigger = db.Column(db.String(150), nullable=True)
+    schedule_time = db.Column(db.DateTime, nullable=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
 
 # Update authenticate function to query the database
 def authenticate(username, password):
@@ -420,6 +498,40 @@ def fetch_file_structure():
         return jsonify([])
 
 
+# Utility function to get system information
+def get_system_info():
+    os_info = platform.system() + " " + platform.release()
+    processor = platform.processor()
+
+    # Get memory details
+    virtual_mem = psutil.virtual_memory()
+    ram = f"{virtual_mem.total / (1024 ** 3):.2f} GB"
+
+    # Get disk details
+    disk = psutil.disk_usage('/')
+    disk_info = f"{disk.total / (1024 ** 3):.2f} GB"
+
+    return {
+        "os": os_info,
+        "processor": processor,
+        "ram": ram,
+        "disk": disk_info
+    }
+
+
+# Refresh system info route
+@app.route('/refresh_system_info', methods=['GET'])
+@login_required
+def refresh_system_info():
+    package_path = session.get('package_path', None)
+    system_info = get_system_info()
+
+    return jsonify({
+        'package_path': package_path,
+        'system_info': system_info
+    })
+
+
 @app.route('/package_management')
 @login_required
 def package_management():
@@ -430,12 +542,100 @@ def package_management():
     setup_complete = os.path.exists(vaani_directory) and os.path.exists(os.path.join(vaani_directory, 'main_new.exe'))
     package_path = vaani_directory if setup_complete else None
 
+    system_info = get_system_info() if setup_complete else None
+
     # Update the session for frontend access
     session['setup_complete'] = setup_complete
     session['package_path'] = package_path
 
     return render_template('package_management.html', setup_complete=setup_complete,
-                           package_path=package_path)
+                           package_path=package_path, system_info=system_info)
+
+
+# @app.route('/download_package', methods=['POST'])
+# @login_required
+# def download_package():
+#     user = User.query.filter_by(email=session.get('email')).first()
+#     if not user:
+#         flash("User not found.", "danger")
+#         return redirect(url_for('login'))
+#
+#     zip_file_url = "https://github.com/deb9911/VVA_pre_llm/releases/download/v1/pilot_pkg.zip"
+#     home_directory = os.path.expanduser("~")
+#     vaani_directory = os.path.join(home_directory, "Vaani Virtual Assistant")
+#     zip_file_path = os.path.join(vaani_directory, 'package.zip')
+#
+#     # Ensure the 'Vaani Virtual Assistant' directory exists
+#     if not os.path.exists(vaani_directory):
+#         os.makedirs(vaani_directory)
+#
+#     # Step 1: Download the zip file
+#     try:
+#         session['progress'] = 0
+#         with requests.get(zip_file_url, stream=True) as response:
+#             response.raise_for_status()
+#             total_size = int(response.headers.get('content-length', 0))
+#             downloaded_size = 0
+#
+#             with open(zip_file_path, 'wb') as zip_file:
+#                 for chunk in response.iter_content(chunk_size=8192):
+#                     if chunk:
+#                         zip_file.write(chunk)
+#                         downloaded_size += len(chunk)
+#                         session['progress'] = int((downloaded_size / total_size) * 100)
+#     except requests.exceptions.RequestException as e:
+#         return jsonify({'status': 'error', 'message': f"Failed to download zip file: {str(e)}"}), 500
+#
+#     # Step 2: Extract the zip file
+#     try:
+#         with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
+#             zip_ref.extractall(vaani_directory)
+#
+#         # Write token to a configuration file
+#         # config_path = os.path.join(vaani_directory, 'user_config.json')
+#         config_path = os.path.join(vaani_directory, 'user_token.json')
+#         with open(config_path, 'w') as config_file:
+#             json.dump({'token': user.token}, config_file)
+#
+#
+#
+#         # Step 3: Organize files into directories
+#         log_directory = os.path.join(vaani_directory, "log")
+#         query_directory = os.path.join(vaani_directory, "query_list")
+#         os.makedirs(log_directory, exist_ok=True)
+#         os.makedirs(query_directory, exist_ok=True)
+#
+#         # Move cmd.json to query_list directory
+#         cmd_json = next((f for f in zip_ref.namelist() if 'cmd.json' in f), None)
+#         if cmd_json:
+#             shutil.move(os.path.join(vaani_directory, cmd_json), os.path.join(query_directory, 'cmd.json'))
+#         else:
+#             return jsonify({'status': 'error', 'message': 'cmd.json not found in the zip file'}), 500
+#
+#         # Move main_new.exe to the vaani_directory (main directory)
+#         main_exe = next((f for f in zip_ref.namelist() if 'main_new.exe' in f), None)
+#         if main_exe:
+#             shutil.move(os.path.join(vaani_directory, main_exe), os.path.join(vaani_directory, 'main_new.exe'))
+#         else:
+#             return jsonify({'status': 'error', 'message': 'main_new.exe not found in the zip file'}), 500
+#
+#         # Remove the extracted 'dist' directory if it exists
+#         dist_directory = os.path.join(vaani_directory, 'dist')
+#         if os.path.exists(dist_directory):
+#             shutil.rmtree(dist_directory)
+#
+#     except Exception as e:
+#         return jsonify({'status': 'error', 'message': f"Failed to extract or organize files: {str(e)}"}), 500
+#
+#     # Step 4: Delete the zip file after extraction
+#     try:
+#         os.remove(zip_file_path)
+#     except Exception as e:
+#         return jsonify({'status': 'error', 'message': f"Failed to delete zip file: {str(e)}"}), 500
+#
+#     session['progress'] = 100
+#     return jsonify({'status': 'success', 'message': 'Package downloaded, extracted, and organized successfully.',
+#                     'package_path': vaani_directory})
 
 
 @app.route('/download_package', methods=['POST'])
@@ -443,8 +643,7 @@ def package_management():
 def download_package():
     user = User.query.filter_by(email=session.get('email')).first()
     if not user:
-        flash("User not found.", "danger")
-        return redirect(url_for('login'))
+        return jsonify({'status': 'error', 'message': "User not found."}), 400
 
     zip_file_url = "https://github.com/deb9911/VVA_pre_llm/releases/download/v1/pilot_pkg.zip"
     home_directory = os.path.expanduser("~")
@@ -455,9 +654,11 @@ def download_package():
     if not os.path.exists(vaani_directory):
         os.makedirs(vaani_directory)
 
+    session['progress'] = 0  # Reset progress
+    session['progress_message'] = "Starting download..."
+
     # Step 1: Download the zip file
     try:
-        session['progress'] = 0
         with requests.get(zip_file_url, stream=True) as response:
             response.raise_for_status()
             total_size = int(response.headers.get('content-length', 0))
@@ -469,23 +670,23 @@ def download_package():
                         zip_file.write(chunk)
                         downloaded_size += len(chunk)
                         session['progress'] = int((downloaded_size / total_size) * 100)
+                        session['progress_message'] = f"Downloading... {session['progress']}% complete"
     except requests.exceptions.RequestException as e:
         return jsonify({'status': 'error', 'message': f"Failed to download zip file: {str(e)}"}), 500
 
     # Step 2: Extract the zip file
     try:
+        session['progress_message'] = "Extracting package..."
         with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
             zip_ref.extractall(vaani_directory)
 
         # Write token to a configuration file
-        # config_path = os.path.join(vaani_directory, 'user_config.json')
         config_path = os.path.join(vaani_directory, 'user_token.json')
         with open(config_path, 'w') as config_file:
             json.dump({'token': user.token}, config_file)
 
-
-
         # Step 3: Organize files into directories
+        session['progress_message'] = "Organizing files..."
         log_directory = os.path.join(vaani_directory, "log")
         query_directory = os.path.join(vaani_directory, "query_list")
         os.makedirs(log_directory, exist_ok=True)
@@ -515,13 +716,16 @@ def download_package():
 
     # Step 4: Delete the zip file after extraction
     try:
+        session['progress_message'] = "Cleaning up..."
         os.remove(zip_file_path)
     except Exception as e:
         return jsonify({'status': 'error', 'message': f"Failed to delete zip file: {str(e)}"}), 500
 
     session['progress'] = 100
+    session['progress_message'] = "Download complete."
     return jsonify({'status': 'success', 'message': 'Package downloaded, extracted, and organized successfully.',
                     'package_path': vaani_directory})
+
 
 
 @app.route('/progress', methods=['GET'])
@@ -536,6 +740,98 @@ def get_progress():
 @login_required
 def settings():
     return render_template('settings.html')
+
+
+@app.route('/add_task', methods=['GET', 'POST'])
+@login_required
+def add_task():
+    form = TaskForm()
+    if form.validate_on_submit():
+        task = Task(
+            title=form.title.data,
+            description=form.description.data,
+            due_date=form.due_date.data,
+            priority=form.priority.data,
+            user_id=session['user_id']
+        )
+        db.session.add(task)
+        db.session.commit()
+        flash('Task added successfully!', 'success')
+        return redirect(url_for('configurable_items'))
+    return render_template('configurable_items.html', task_form=form)
+
+
+@app.route('/configurable_items', methods=['GET', 'POST'])
+@login_required
+def configurable_items():
+    # Initialize forms
+    task_form = TaskForm()
+    reminder_form = ReminderForm()
+    note_form = NoteForm()
+    command_form = CustomCommandForm()
+
+    # Fetch data for the current user (assuming `user_id` is stored in the session)
+    user_id = session.get('user_id')
+    tasks = Task.query.filter_by(user_id=user_id).all()
+    reminders = Reminder.query.filter_by(user_id=user_id).all()
+    notes = Note.query.filter_by(user_id=user_id).all()
+    commands = CustomCommand.query.filter_by(user_id=user_id).all()
+
+    # Handling form submissions
+    if task_form.validate_on_submit():
+        task = Task(
+            title=task_form.title.data,
+            description=task_form.description.data,
+            due_date=task_form.due_date.data,
+            priority=task_form.priority.data,
+            user_id=user_id
+        )
+        db.session.add(task)
+        db.session.commit()
+        flash('Task added successfully!', 'success')
+        return redirect(url_for('configurable_items'))
+
+    if reminder_form.validate_on_submit():
+        reminder = Reminder(
+            title=reminder_form.title.data,
+            reminder_time=reminder_form.reminder_time.data,
+            repeat=reminder_form.repeat.data,
+            user_id=user_id
+        )
+        db.session.add(reminder)
+        db.session.commit()
+        flash('Reminder added successfully!', 'success')
+        return redirect(url_for('configurable_items'))
+
+    if note_form.validate_on_submit():
+        note = Note(
+            title=note_form.title.data,
+            content=note_form.content.data,
+            tags=note_form.tags.data,
+            user_id=user_id
+        )
+        db.session.add(note)
+        db.session.commit()
+        flash('Note saved successfully!', 'success')
+        return redirect(url_for('configurable_items'))
+
+    if command_form.validate_on_submit():
+        command = CustomCommand(
+            command_name=command_form.command_name.data,
+            command_action=command_form.command_action.data,
+            voice_trigger=command_form.voice_trigger.data,
+            schedule_time=command_form.schedule_time.data,
+            user_id=user_id
+        )
+        db.session.add(command)
+        db.session.commit()
+        flash('Command added successfully!', 'success')
+        return redirect(url_for('configurable_items'))
+
+    return render_template('configurable_items.html', task_form=task_form, reminder_form=reminder_form,
+                           note_form=note_form, command_form=command_form, tasks=tasks, reminders=reminders,
+                           notes=notes, commands=commands)
+
 
 
 # Route to add a new tab

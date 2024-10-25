@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2>Configurable Items</h2>
+
+    <div class="row">
+        <!-- Add Task Form -->
+        <div class="col-md-3">
+            <div class="metro-card">
+                <h3>Add Task</h3>
+                <form method="POST" action="{{ url_for('configurable_items') }}">
+                    {{ task_form.hidden_tag() }}
+                    {{ task_form.title.label }} {{ task_form.title() }}
+                    {{ task_form.description.label }} {{ task_form.description() }}
+                    {{ task_form.due_date.label }} {{ task_form.due_date() }}
+                    {{ task_form.priority.label }} {{ task_form.priority() }}
+                    {{ task_form.submit(class="btn btn-primary btn-block") }}
+                </form>
+            </div>
+        </div>
+
+        <!-- Add Reminder Form -->
+        <div class="col-md-3">
+            <div class="metro-card">
+                <h3>Set Reminder</h3>
+                <form method="POST" action="{{ url_for('configurable_items') }}">
+                    {{ reminder_form.hidden_tag() }}
+                    {{ reminder_form.title.label }} {{ reminder_form.title() }}
+                    {{ reminder_form.reminder_time.label }} {{ reminder_form.reminder_time() }}
+                    {{ reminder_form.repeat.label }} {{ reminder_form.repeat() }}
+                    {{ reminder_form.submit(class="btn btn-primary btn-block") }}
+                </form>
+            </div>
+        </div>
+
+        <!-- Add Note Form -->
+        <div class="col-md-3">
+            <div class="metro-card">
+                <h3>Add Note</h3>
+                <form method="POST" action="{{ url_for('configurable_items') }}">
+                    {{ note_form.hidden_tag() }}
+                    {{ note_form.title.label }} {{ note_form.title() }}
+                    {{ note_form.content.label }} {{ note_form.content() }}
+                    {{ note_form.tags.label }} {{ note_form.tags() }}
+                    {{ note_form.submit(class="btn btn-primary btn-block") }}
+                </form>
+            </div>
+        </div>
+
+        <!-- Add Command Form -->
+        <div class="col-md-3">
+            <div class="metro-card">
+                <h3>Add Command</h3>
+                <form method="POST" action="{{ url_for('configurable_items') }}">
+                    {{ command_form.hidden_tag() }}
+                    {{ command_form.command_name.label }} {{ command_form.command_name() }}
+                    {{ command_form.command_action.label }} {{ command_form.command_action() }}
+                    {{ command_form.voice_trigger.label }} {{ command_form.voice_trigger() }}
+                    {{ command_form.schedule_time.label }} {{ command_form.schedule_time() }}
+                    {{ command_form.submit(class="btn btn-primary btn-block") }}
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <hr />
+
+    <h3>Existing Configurations</h3>
+
+    <div class="row">
+        <!-- Tasks -->
+        <div class="col-md-3">
+            <div class="metro-card">
+                <h4>Tasks</h4>
+                <ul>
+                    {% for task in tasks %}
+                    <li>{{ task.title }} - Due: {{ task.due_date }} (Priority: {{ task.priority }})</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+
+        <!-- Reminders -->
+        <div class="col-md-3">
+            <div class="metro-card">
+                <h4>Reminders</h4>
+                <ul>
+                    {% for reminder in reminders %}
+                    <li>{{ reminder.title }} - Time: {{ reminder.reminder_time }} (Repeat: {{ reminder.repeat }})</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+
+        <!-- Notes -->
+        <div class="col-md-3">
+            <div class="metro-card">
+                <h4>Notes</h4>
+                <ul>
+                    {% for note in notes %}
+                    <li>{{ note.title }} - Tags: {{ note.tags }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+
+        <!-- Commands -->
+        <div class="col-md-3">
+            <div class="metro-card">
+                <h4>Commands</h4>
+                <ul>
+                    {% for command in commands %}
+                    <li>{{ command.command_name }} - Action: {{ command.command_action }} (Trigger: {{ command.voice_trigger }})</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

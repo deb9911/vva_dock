@@ -8,7 +8,11 @@
                 <h2>Package Information</h2>
                 <p id="packageDetails">
                     {% if setup_complete %}
-                        Package found at: {{ package_path }}
+                        <strong>Package found at:</strong> {{ package_path }}
+                        <br><strong>Operating System:</strong> {{ system_info.os }}
+                        <br><strong>Processor:</strong> {{ system_info.processor }}
+                        <br><strong>RAM:</strong> {{ system_info.ram }}
+                        <br><strong>Hard Drive:</strong> {{ system_info.disk }}
                     {% else %}
                         No package found. Please download it.
                     {% endif %}
@@ -17,39 +21,78 @@
         </div>
 
         <div class="col-md-4 text-right">
-            {% if not setup_complete %}
-                <button id="getPackageBtn" class="btn btn-primary">Get Package</button>
+            {% if setup_complete %}
+                <button id="refreshBtn" class="btn btn-secondary">Refresh</button>
+            {% else %}
+                <button id="getPackageBtn" class="btn btn-primary">Download Package</button>
             {% endif %}
         </div>
     </div>
 
+    <!-- Step-by-step Progress Updates -->
+    <div id="progressUpdates" class="mt-3" style="display: none;">
+        <h3>Progress</h3>
+        <ul id="progressSteps">
+            <li id="step-download">Downloading package...</li>
+            <li id="step-extract">Extracting package...</li>
+            <li id="step-organize">Organizing files...</li>
+            <li id="step-cleanup">Cleaning up temporary files...</li>
+        </ul>
+    </div>
+
     <!-- Progress Bar -->
-    {% if not setup_complete %}
-        <div class="progress mt-3">
-            <div id="progressBar" class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
-        </div>
-    {% endif %}
+    <div class="progress mt-3">
+        <div id="progressBar" class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+    </div>
 </div>
 
 <script>
     document.addEventListener("DOMContentLoaded", function() {
         const getPackageBtn = document.getElementById("getPackageBtn");
-        const infoPanel = document.getElementById("infoPanel");
-        const packageDetails = document.getElementById("packageDetails");
+        const progressUpdates = document.getElementById("progressUpdates");
+        const progressSteps = document.getElementById("progressSteps");
         const progressBar = document.getElementById('progressBar');
+        const refreshBtn = document.getElementById("refreshBtn");
 
+        // Refresh system information
+        if (refreshBtn) {
+            refreshBtn.addEventListener("click", function() {
+                fetch('/refresh_system_info')
+                    .then(response => response.json())
+                    .then(data => {
+                        const details = document.getElementById("packageDetails");
+                        details.innerHTML = `
+                            <strong>Package found at:</strong> ${data.package_path} <br>
+                            <strong>Operating System:</strong> ${data.system_info.os} <br>
+                            <strong>Processor:</strong> ${data.system_info.processor} <br>
+                            <strong>RAM:</strong> ${data.system_info.ram} <br>
+                            <strong>Hard Drive:</strong> ${data.system_info.disk}
+                        `;
+                    })
+                    .catch(error => {
+                        alert("An error occurred while refreshing: " + error.message);
+                    });
+            });
+        }
+
+        // Download package functionality (as it is)
         if (getPackageBtn) {
             getPackageBtn.addEventListener("click", function() {
                 getPackageBtn.disabled = true;
                 getPackageBtn.textContent = "Processing...";
 
-                // Fetch package download
+                // Show the progress updates panel
+                progressUpdates.style.display = "block";
+
                 fetch('/download_package', { method: 'POST' })
                     .then(response => response.json())
                     .then(data => {
                         if (data.status === 'success') {
-                            packageDetails.textContent = `Package downloaded and extracted to: ${data.package_path}`;
-                            infoPanel.style.display = "block";
+                            updateStep('step-download', 'Download complete');
+                            updateStep('step-extract', 'Extracting package...');
+                            updateStep('step-organize', 'Organizing files...');
+                            updateStep('step-cleanup', 'Cleaning up...');
+                            progressSteps.innerHTML += `<li>Package downloaded and extracted to: ${data.package_path}</li>`;
                         } else {
                             throw new Error(data.message);
                         }
@@ -59,10 +102,10 @@
                     })
                     .finally(() => {
                         getPackageBtn.disabled = false;
-                        getPackageBtn.textContent = "Get Package";
+                        getPackageBtn.textContent = "Download Package";
                     });
 
-                // Start progress bar monitoring
+                // Start polling progress bar
                 const intervalId = setInterval(() => {
                     fetch('/progress')
                         .then(response => response.json())
@@ -82,6 +125,13 @@
                         });
                 }, 1000);
             });
+        }
+
+        function updateStep(stepId, message) {
+            const step = document.getElementById(stepId);
+            if (step) {
+                step.textContent = message;
+            }
         }
     });
 </script>

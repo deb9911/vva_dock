@@ -37,8 +37,13 @@
                         <li class="nav-item {% if request.endpoint == 'settings' %}active{% endif %}">
                             <a class="nav-link" href="{{ url_for('settings') }}">Settings</a>
                         </li>
+                        <!-- In base.html or navigation.html -->
                         <li class="nav-item {% if request.endpoint == 'add_tab' %}active{% endif %}">
                             <a class="nav-link" href="{{ url_for('add_tab') }}">Add Tab</a>
+                        </li>
+                        <!-- New Configurable Items Tab -->
+                        <li class="nav-item {% if request.endpoint == 'configurable_items' %}active{% endif %}">
+                            <a class="nav-link" href="{{ url_for('configurable_items') }}">Configurable Items</a>
                         </li>
                     </ul>
                     <div class="d-flex justify-content-end">
