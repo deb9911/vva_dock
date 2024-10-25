@@ -170,21 +170,63 @@ def authenticate(username, password):
     return user and user.check_password(password)
 
 
-@app.route('/login', methods=['GET', 'POST'])
+# @app.route('/login', methods=['GET', 'POST'])
+# def login():
+#     if request.method == 'POST':
+#         username = request.form['username']
+#         password = request.form['password']
+#         if authenticate(username, password):
+#             session['logged_in'] = True
+#             session['email'] = username
+#             flash('Login successful!', 'success')
+#             return redirect(url_for('home'))
+#         else:
+#             flash('User not found. Please log in again.', 'danger')
+#     return render_template('login.html')
+
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        if authenticate(username, password):
-            session['logged_in'] = True
-            session['email'] = username
-            flash('Login successful!', 'success')
-            return redirect(url_for('home'))
-        else:
-            flash('User not found. Please log in again.', 'danger')
-    return render_template('login.html')
+        # Check if JSON or form data is being used
+        data = request.json if request.is_json else request.form
+        username = data.get("username")
+        password = data.get("password")
 
+        # Debug: Check if data is received correctly
+        print(f"Username: {username}, Password: {password}")
+
+        # Perform user authentication
+        if authenticate(username, password):
+            agent_token = secrets.token_hex(32)  # Generate a unique token
+            session['agent_token'] = agent_token  # Store token in session
+            session['logged_in'] = True  # Mark the user as logged in
+
+            # Save the token for the agent
+            user_directory = os.path.expanduser("~")
+            token_path = os.path.join(user_directory, "Vaani Virtual Assistant", "user_token.json")
+            user_data = {"token": agent_token}
+
+            os.makedirs(os.path.dirname(token_path), exist_ok=True)
+            with open(token_path, "w") as f:
+                json.dump(user_data, f)
+
+            # JSON response for the agent
+            if request.is_json:
+                return jsonify({"status": "success", "token": agent_token})
+            else:
+                flash("Login successful!", "success")
+                return redirect(url_for("home"))
+
+        # Handle invalid credentials
+        if request.is_json:
+            return jsonify({"status": "error", "message": "Invalid credentials"}), 401
+        else:
+            flash("Invalid credentials. Please try again.", "danger")
+            return redirect(url_for("login"))
+
+    # Render login page for GET request
+    return render_template("login.html")
 
 
 # @app.route('/login', methods=['GET', 'POST'])
@@ -241,13 +283,25 @@ def login_required(f):
     return decorated_function
 
 
+# @app.route('/validate_token', methods=['POST'])
+# def validate_token():
+#     data = request.get_json()
+#     token = data.get('token')
+#     # Logic to validate the token, e.g., check against the database
+#     user = User.query.filter_by(token=token).first()
+#     if user:
+#         return jsonify({"status": "valid"})
+#     else:
+#         return jsonify({"status": "invalid", "message": "Token is invalid."}), 401
+
+
 @app.route('/validate_token', methods=['POST'])
 def validate_token():
-    data = request.get_json()
+    data = request.json
     token = data.get('token')
-    # Logic to validate the token, e.g., check against the database
-    user = User.query.filter_by(token=token).first()
-    if user:
+
+    # Verify the token against the session or database
+    if session.get("agent_token") == token:
         return jsonify({"status": "valid"})
     else:
         return jsonify({"status": "invalid", "message": "Token is invalid."}), 401
@@ -832,6 +886,55 @@ def configurable_items():
                            note_form=note_form, command_form=command_form, tasks=tasks, reminders=reminders,
                            notes=notes, commands=commands)
 
+
+# In-memory storage for any pending commands for the Agent
+pending_commands = []
+
+
+@app.route('/check_updates', methods=['GET'])
+def check_updates():
+    # Get the Authorization token from the request headers
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or " " not in auth_header:
+        return jsonify({'status': 'error', 'message': 'Authorization header missing or malformed'}), 400
+
+    token = auth_header.split(" ")[1]  # Extract the token from 'Bearer <token>'
+
+    # Validate the token against the session (or database if applicable)
+    if session.get("agent_token") != token:
+        return jsonify({'status': 'error', 'message': 'Unauthorized'}), 401
+
+    # Check if there are any pending commands for the Agent
+    if pending_commands:
+        command = pending_commands.pop(0)  # Get the next command
+        return jsonify({'status': 'success', 'data': command})
+    else:
+        return jsonify({'status': 'success', 'data': 'No updates'})
+
+
+@app.route('/add_command', methods=['POST'])
+def add_command():
+    command = request.json.get('command')
+    if command:
+        pending_commands.append(command)
+        return jsonify({'status': 'success', 'message': 'Command added'}), 200
+    return jsonify({'status': 'error', 'message': 'Command is missing'}), 400
+
+
+@app.route('/sync_system_info', methods=['POST'])
+def sync_system_info():
+    """Receives system information from the agent."""
+    # Get the token from headers for validation
+    auth_header = request.headers.get('Authorization')
+    token = auth_header.split(" ")[1] if auth_header else None
+
+    # Validate the token
+    if session.get('agent_token') != token:
+        return jsonify({'status': 'error', 'message': 'Unauthorized'}), 401
+
+    system_info = request.json
+    session['system_info'] = system_info  # Store system info in session or database
+    return jsonify({'status': 'success', 'message': 'System info synced successfully'})
 
 
 # Route to add a new tab
