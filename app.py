@@ -12,6 +12,7 @@ import psutil
 import platform
 
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
+from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import FlaskForm
 from flask_cors import CORS
@@ -21,6 +22,17 @@ from wtforms import (StringField, PasswordField, SubmitField, StringField, TextA
                      SubmitField, SelectField)
 from wtforms.validators import DataRequired, Email, EqualTo, Length
 from datetime import datetime
+try:
+    # import pymysql
+    import mysqlclient as MySQLdb
+    # mysqlclient.install_as_MySQLdb()
+except ImportError:
+    pass
+try:
+    import pysqlite3 as pysqlite2
+except ImportError:
+    pass
+from threading import Lock
 
 # Generate a secure secret key for the Flask app
 secure_key = secrets.token_hex(16)
@@ -30,15 +42,23 @@ app.secret_key = secure_key  # Necessary for session management
 app.config['SECRET_KEY'] = secure_key
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Options: 'Lax', 'Strict', or 'None'
 app.config['SESSION_COOKIE_SECURE'] = True     # Use True only if using HTTPS
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
+# app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
+# app.config['SQLALCHEMY_DATABASE_URI'] =  "user=postgres.roqyjwmelanftcygibvh password='Shivaa@2025' host=aws-0-ap-south-1.pooler.supabase.com port=6543 dbname=postgres"
+app.config['SQLALCHEMY_DATABASE_URI'] =  "postgresql://postgres.roqyjwmelanftcygibvh:Shivaa%402025@aws-0-ap-south-1.pooler.supabase.com:6543/postgres"
+
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
+migrate = Migrate(app, db)
 
 migrate = Migrate(app, db)
 
 # Initialize variables to store search status and log directory
 SEARCH_STATUS = {'progress': 0, 'status': 'Searching...', 'found': False}
 LOG_DIRECTORY = None
+
+# Shared progress variable
+PROGRESS = {"value": 0}
+progress_lock = Lock()
 
 # Directories to search (you can add/remove directories as needed)
 # Dynamically fetch the user's home directory
@@ -73,8 +93,8 @@ def get_session():
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(150), unique=True, nullable=False)
-    password_hash = db.Column(db.String(128), nullable=False)
-    token = db.Column(db.String(64), unique=True, nullable=False)
+    password_hash = db.Column(db.String(256), nullable=False)
+    token = db.Column(db.String(256), unique=True, nullable=False)
 
     def set_password(self, password):
         """Hashes the password and stores it in the password_hash field."""
@@ -167,7 +187,9 @@ class CustomCommand(db.Model):
 # Update authenticate function to query the database
 def authenticate(username, password):
     user = User.query.filter_by(email=username).first()
-    return user and user.check_password(password)
+    if user and user.check_password(password):  # Check if the password matches
+        return user  # Return the user object
+    return None  # Return None if authentication fails
 
 
 # @app.route('/login', methods=['GET', 'POST'])
@@ -194,22 +216,31 @@ def login():
         password = data.get("password")
 
         # Debug: Check if data is received correctly
-        print(f"Username: {username}, Password: {password}")
+        print(f"Login Attempt - Username: {username}, Password: {password}")
 
         # Perform user authentication
-        if authenticate(username, password):
-            agent_token = secrets.token_hex(32)  # Generate a unique token
-            session['agent_token'] = agent_token  # Store token in session
-            session['logged_in'] = True  # Mark the user as logged in
+        user = authenticate(username, password)
+        if user:
+            # Generate a unique token and set session variables
+            agent_token = secrets.token_hex(32)
+            session['agent_token'] = agent_token
+            session['logged_in'] = True
+            session['user_id'] = user.id
+            session['email'] = user.email
 
             # Save the token for the agent
-            user_directory = os.path.expanduser("~")
-            token_path = os.path.join(user_directory, "Vaani Virtual Assistant", "user_token.json")
-            user_data = {"token": agent_token}
+            try:
+                user_directory = os.path.expanduser("~")
+                token_path = os.path.join(user_directory, "Vaani Virtual Assistant", "user_token.json")
+                user_data = {"token": agent_token}
 
-            os.makedirs(os.path.dirname(token_path), exist_ok=True)
-            with open(token_path, "w") as f:
-                json.dump(user_data, f)
+                os.makedirs(os.path.dirname(token_path), exist_ok=True)
+                with open(token_path, "w") as f:
+                    json.dump(user_data, f)
+            except Exception as e:
+                print(f"Error saving token: {e}")
+                flash("An error occurred while saving your session token.", "danger")
+                return redirect(url_for("login"))
 
             # JSON response for the agent
             if request.is_json:
@@ -222,11 +253,12 @@ def login():
         if request.is_json:
             return jsonify({"status": "error", "message": "Invalid credentials"}), 401
         else:
-            flash("Invalid credentials. Please try again.", "danger")
+            flash("Invalid credentials. Please check your username and password.", "danger")
             return redirect(url_for("login"))
 
     # Render login page for GET request
     return render_template("login.html")
+
 
 
 # @app.route('/login', methods=['GET', 'POST'])
@@ -253,19 +285,52 @@ def logout():
 # ======================
 
 
+# @app.route('/register', methods=['GET', 'POST'])
+# def register():
+#     form = RegistrationForm()
+#     if form.validate_on_submit():
+#         # Hash the password and save the user
+#         new_user = User(email=form.email.data)
+#         new_user.set_password(form.password.data)
+#         new_user.token = secrets.token_hex(32)
+#         db.session.add(new_user)
+#         db.session.commit()
+#         flash('Registration successful! You can now log in.', 'success')
+#         return redirect(url_for('login'))
+#     return render_template('register.html', form=form)
+
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     form = RegistrationForm()
+
     if form.validate_on_submit():
-        # Hash the password and save the user
-        new_user = User(email=form.email.data)
-        new_user.set_password(form.password.data)
-        new_user.token = secrets.token_hex(32)
-        db.session.add(new_user)
-        db.session.commit()
-        flash('Registration successful! You can now log in.', 'success')
-        return redirect(url_for('login'))
+        email = form.email.data
+        password = form.password.data
+        print(f"Registering user with email: {email}")
+
+        existing_user = User.query.filter_by(email=email).first()
+        if existing_user:
+            flash('Email is already registered.', 'danger')
+            return redirect(url_for('login'))
+
+        try:
+            new_user = User(email=email, token=secrets.token_hex(32))
+            new_user.set_password(password)
+            db.session.add(new_user)
+            db.session.commit()
+            print("User registered successfully!")
+            flash('Registration successful! Please log in.', 'success')
+            return redirect(url_for('login'))
+        except Exception as e:
+            print(f"Error during registration: {e}")
+            db.session.rollback()
+            flash('An error occurred. Please try again.', 'danger')
+            return redirect(url_for('register'))
+
     return render_template('register.html', form=form)
+
+
+
 
 
 # ======================
@@ -606,98 +671,14 @@ def package_management():
                            package_path=package_path, system_info=system_info)
 
 
-# @app.route('/download_package', methods=['POST'])
-# @login_required
-# def download_package():
-#     user = User.query.filter_by(email=session.get('email')).first()
-#     if not user:
-#         flash("User not found.", "danger")
-#         return redirect(url_for('login'))
-#
-#     zip_file_url = "https://github.com/deb9911/VVA_pre_llm/releases/download/v1/pilot_pkg.zip"
-#     home_directory = os.path.expanduser("~")
-#     vaani_directory = os.path.join(home_directory, "Vaani Virtual Assistant")
-#     zip_file_path = os.path.join(vaani_directory, 'package.zip')
-#
-#     # Ensure the 'Vaani Virtual Assistant' directory exists
-#     if not os.path.exists(vaani_directory):
-#         os.makedirs(vaani_directory)
-#
-#     # Step 1: Download the zip file
-#     try:
-#         session['progress'] = 0
-#         with requests.get(zip_file_url, stream=True) as response:
-#             response.raise_for_status()
-#             total_size = int(response.headers.get('content-length', 0))
-#             downloaded_size = 0
-#
-#             with open(zip_file_path, 'wb') as zip_file:
-#                 for chunk in response.iter_content(chunk_size=8192):
-#                     if chunk:
-#                         zip_file.write(chunk)
-#                         downloaded_size += len(chunk)
-#                         session['progress'] = int((downloaded_size / total_size) * 100)
-#     except requests.exceptions.RequestException as e:
-#         return jsonify({'status': 'error', 'message': f"Failed to download zip file: {str(e)}"}), 500
-#
-#     # Step 2: Extract the zip file
-#     try:
-#         with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
-#             zip_ref.extractall(vaani_directory)
-#
-#         # Write token to a configuration file
-#         # config_path = os.path.join(vaani_directory, 'user_config.json')
-#         config_path = os.path.join(vaani_directory, 'user_token.json')
-#         with open(config_path, 'w') as config_file:
-#             json.dump({'token': user.token}, config_file)
-#
-#
-#
-#         # Step 3: Organize files into directories
-#         log_directory = os.path.join(vaani_directory, "log")
-#         query_directory = os.path.join(vaani_directory, "query_list")
-#         os.makedirs(log_directory, exist_ok=True)
-#         os.makedirs(query_directory, exist_ok=True)
-#
-#         # Move cmd.json to query_list directory
-#         cmd_json = next((f for f in zip_ref.namelist() if 'cmd.json' in f), None)
-#         if cmd_json:
-#             shutil.move(os.path.join(vaani_directory, cmd_json), os.path.join(query_directory, 'cmd.json'))
-#         else:
-#             return jsonify({'status': 'error', 'message': 'cmd.json not found in the zip file'}), 500
-#
-#         # Move main_new.exe to the vaani_directory (main directory)
-#         main_exe = next((f for f in zip_ref.namelist() if 'main_new.exe' in f), None)
-#         if main_exe:
-#             shutil.move(os.path.join(vaani_directory, main_exe), os.path.join(vaani_directory, 'main_new.exe'))
-#         else:
-#             return jsonify({'status': 'error', 'message': 'main_new.exe not found in the zip file'}), 500
-#
-#         # Remove the extracted 'dist' directory if it exists
-#         dist_directory = os.path.join(vaani_directory, 'dist')
-#         if os.path.exists(dist_directory):
-#             shutil.rmtree(dist_directory)
-#
-#     except Exception as e:
-#         return jsonify({'status': 'error', 'message': f"Failed to extract or organize files: {str(e)}"}), 500
-#
-#     # Step 4: Delete the zip file after extraction
-#     try:
-#         os.remove(zip_file_path)
-#     except Exception as e:
-#         return jsonify({'status': 'error', 'message': f"Failed to delete zip file: {str(e)}"}), 500
-#
-#     session['progress'] = 100
-#     return jsonify({'status': 'success', 'message': 'Package downloaded, extracted, and organized successfully.',
-#                     'package_path': vaani_directory})
-
-
 @app.route('/download_package', methods=['POST'])
 @login_required
 def download_package():
+    global PROGRESS
     user = User.query.filter_by(email=session.get('email')).first()
     if not user:
-        return jsonify({'status': 'error', 'message': "User not found."}), 400
+        flash("User not found.", "danger")
+        return redirect(url_for('login'))
 
     zip_file_url = "https://github.com/deb9911/VVA_pre_llm/releases/download/v1/pilot_pkg.zip"
     home_directory = os.path.expanduser("~")
@@ -708,11 +689,13 @@ def download_package():
     if not os.path.exists(vaani_directory):
         os.makedirs(vaani_directory)
 
-    session['progress'] = 0  # Reset progress
-    session['progress_message'] = "Starting download..."
-
     # Step 1: Download the zip file
     try:
+        session['progress'] = 0
+        db.session.commit()  # Commit to persist session changes
+        # Reset progress
+        with progress_lock:
+            PROGRESS["value"] = 0
         with requests.get(zip_file_url, stream=True) as response:
             response.raise_for_status()
             total_size = int(response.headers.get('content-length', 0))
@@ -723,24 +706,28 @@ def download_package():
                     if chunk:
                         zip_file.write(chunk)
                         downloaded_size += len(chunk)
-                        session['progress'] = int((downloaded_size / total_size) * 100)
-                        session['progress_message'] = f"Downloading... {session['progress']}% complete"
+                        # session['progress'] = int((downloaded_size / total_size) * 100)
+                        with progress_lock:
+                            PROGRESS["value"] = int((downloaded_size / total_size) * 100)
+                        db.session.commit()  # Commit session progress changes
     except requests.exceptions.RequestException as e:
         return jsonify({'status': 'error', 'message': f"Failed to download zip file: {str(e)}"}), 500
 
     # Step 2: Extract the zip file
     try:
-        session['progress_message'] = "Extracting package..."
+        # Step 2: Extract the zip file
+        with progress_lock:
+            PROGRESS["value"] = 95
         with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
             zip_ref.extractall(vaani_directory)
 
         # Write token to a configuration file
+        # config_path = os.path.join(vaani_directory, 'user_config.json')
         config_path = os.path.join(vaani_directory, 'user_token.json')
         with open(config_path, 'w') as config_file:
             json.dump({'token': user.token}, config_file)
 
         # Step 3: Organize files into directories
-        session['progress_message'] = "Organizing files..."
         log_directory = os.path.join(vaani_directory, "log")
         query_directory = os.path.join(vaani_directory, "query_list")
         os.makedirs(log_directory, exist_ok=True)
@@ -770,23 +757,44 @@ def download_package():
 
     # Step 4: Delete the zip file after extraction
     try:
-        session['progress_message'] = "Cleaning up..."
         os.remove(zip_file_path)
+        with progress_lock:
+            PROGRESS["value"] = 100
     except Exception as e:
+        with progress_lock:
+            PROGRESS["value"] = 0
         return jsonify({'status': 'error', 'message': f"Failed to delete zip file: {str(e)}"}), 500
 
-    session['progress'] = 100
-    session['progress_message'] = "Download complete."
+    # session['progress'] = 100
     return jsonify({'status': 'success', 'message': 'Package downloaded, extracted, and organized successfully.',
                     'package_path': vaani_directory})
 
+
+# @app.route('/download_package', methods=['POST'])
+# @login_required
+# def download_package():
+#     user = User.query.filter_by(email=session.get('email')).first()
+#     if not user:
+#         return jsonify({'status': 'error', 'message': "User not found."}), 400
+#
+#     # Provide the direct GitHub link for the client to download
+#     zip_file_url = "https://github.com/deb9911/VVA_pre_llm/releases/download/v1/pilot_pkg.zip"
+#
+#     # Respond with the download URL and instructions to handle post-download processing
+#     return jsonify({
+#         'status': 'success',
+#         'message': 'Download the package using the provided URL and process it locally.',
+#         'download_url': zip_file_url
+#     })
 
 
 @app.route('/progress', methods=['GET'])
 @login_required
 def get_progress():
-    progress = session.get('progress', 0)
-    return jsonify({'progress': progress})
+    # progress = session.get('progress', 0)
+    # return jsonify({'progress': progress})
+    with progress_lock:
+        return jsonify({'progress': PROGRESS["value"]})
 
 
 # Route for settings page

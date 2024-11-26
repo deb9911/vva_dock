@@ -75,56 +75,85 @@
             });
         }
 
-        // Download package functionality (as it is)
+        // Initiate the download and notify VVA_Agent
         if (getPackageBtn) {
             getPackageBtn.addEventListener("click", function() {
-                getPackageBtn.disabled = true;
-                getPackageBtn.textContent = "Processing...";
+                initiateDownload();
+            });
+        }
 
-                // Show the progress updates panel
-                progressUpdates.style.display = "block";
+        function initiateDownload() {
+            getPackageBtn.disabled = true;
+            getPackageBtn.textContent = "Processing...";
 
-                fetch('/download_package', { method: 'POST' })
+            // Show the progress updates panel
+            progressUpdates.style.display = "block";
+
+            fetch('/download_package', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${sessionStorage.getItem('authToken')}`
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    const downloadUrl = data.download_url;
+                    const link = document.createElement('a');
+                    link.href = downloadUrl;
+                    link.download = '';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+
+                    // Notify VVA_Agent to start post-download processing
+                    alert('Download initiated. VVA_Agent will handle extraction and setup.');
+                    notifyAgentForProcessing(downloadUrl);
+                } else {
+                    throw new Error(data.message);
+                }
+            })
+            .catch(error => {
+                alert("An error occurred: " + error.message);
+            })
+            .finally(() => {
+                getPackageBtn.disabled = false;
+                getPackageBtn.textContent = "Download Package";
+            });
+
+            // Start polling progress bar
+            const intervalId = setInterval(() => {
+                fetch('/progress')
                     .then(response => response.json())
                     .then(data => {
-                        if (data.status === 'success') {
-                            updateStep('step-download', 'Download complete');
-                            updateStep('step-extract', 'Extracting package...');
-                            updateStep('step-organize', 'Organizing files...');
-                            updateStep('step-cleanup', 'Cleaning up...');
-                            progressSteps.innerHTML += `<li>Package downloaded and extracted to: ${data.package_path}</li>`;
-                        } else {
-                            throw new Error(data.message);
+                        const progress = data.progress;
+                        progressBar.style.width = progress + '%';
+                        progressBar.setAttribute('aria-valuenow', progress);
+                        progressBar.textContent = progress + '%';
+
+                        if (progress >= 100) {
+                            clearInterval(intervalId);
+                            alert('Download and extraction completed!');
                         }
                     })
                     .catch(error => {
-                        alert("An error occurred: " + error.message);
-                    })
-                    .finally(() => {
-                        getPackageBtn.disabled = false;
-                        getPackageBtn.textContent = "Download Package";
+                        alert("An error occurred while updating progress: " + error.message);
+                        clearInterval(intervalId);
                     });
+            }, 1000);
+        }
 
-                // Start polling progress bar
-                const intervalId = setInterval(() => {
-                    fetch('/progress')
-                        .then(response => response.json())
-                        .then(data => {
-                            const progress = data.progress;
-                            progressBar.style.width = progress + '%';
-                            progressBar.setAttribute('aria-valuenow', progress);
-                            progressBar.textContent = progress + '%';
-
-                            if (progress >= 100) {
-                                clearInterval(intervalId);
-                            }
-                        })
-                        .catch(error => {
-                            alert("An error occurred while updating progress: " + error.message);
-                            clearInterval(intervalId);
-                        });
-                }, 1000);
-            });
+        // Function to notify VVA_Agent for post-download tasks
+        function notifyAgentForProcessing(downloadUrl) {
+            fetch('http://localhost:YOUR_AGENT_PORT/process_package', {  // Replace YOUR_AGENT_PORT with the VVA_Agent's actual port
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ download_url: downloadUrl })
+            })
+            .then(response => response.json())
+            .then(data => console.log(data.message))
+            .catch(error => console.error('Error notifying agent:', error));
         }
 
         function updateStep(stepId, message) {
@@ -133,6 +162,26 @@
                 step.textContent = message;
             }
         }
+
+        function pollProgress() {
+        const intervalId = setInterval(() => {
+            fetch('/progress')
+                .then(response => response.json())
+                .then(data => {
+                    const progress = data.progress;
+                    progressBar.style.width = progress + '%';
+                    progressBar.textContent = progress + '%';
+
+                    if (progress >= 100) {
+                        clearInterval(intervalId);
+                    }
+                })
+                .catch(error => {
+                    console.error("Error updating progress:", error);
+                    clearInterval(intervalId);
+                });
+        }, 1000);
+    }
     });
 </script>
 {% endblock %}
